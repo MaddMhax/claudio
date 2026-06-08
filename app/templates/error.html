@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — Claudio{% endblock %}
+{% block content %}
+<section class="error-card">
+    <div class="error-code">{{ code }}</div>
+    <h1>{{ title }}</h1>
+    <p class="error-msg">{{ message }}</p>
+    <div class="form-actions" style="justify-content:center;border:none;padding:0">
+        {% if current_user.is_authenticated %}
+            <a class="btn btn-primary" href="{{ url_for('planning.calendar_default') }}">Retour au planning</a>
+        {% else %}
+            <a class="btn btn-primary" href="{{ url_for('auth.login') }}">Se connecter</a>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

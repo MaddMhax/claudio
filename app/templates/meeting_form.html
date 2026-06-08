@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Modifier la réunion — Claudio{% endblock %}
+{% block content %}
+<section class="form-card form-card-wide">
+    <h1>Modifier la réunion</h1>
+
+    {% if meeting.date_history %}
+    <details class="date-history" open>
+        <summary>
+            <span>Historique des dates</span>
+            <span class="date-history-count">{{ meeting.date_history|length }}</span>
+        </summary>
+        <ul class="date-history-list">
+            {% for h in meeting.date_history %}
+            <li>
+                <div class="date-history-when">
+                    {{ h.changed_at | localdt }}
+                    {% if h.changed_by %}· par {{ h.changed_by.full_name }}{% endif %}
+                </div>
+                <div class="date-history-what">
+                    précédemment planifié le
+                    <strong>{{ h.previous_date.strftime('%d/%m/%Y') }}</strong>
+                    {% if h.previous_start_time and h.previous_end_time %}
+                        de <strong>{{ h.previous_start_time.strftime('%H:%M') }}</strong>
+                        à <strong>{{ h.previous_end_time.strftime('%H:%M') }}</strong>
+                    {% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </details>
+    {% endif %}
+
+    <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+
+        <div class="field">
+            {{ form.name.label }}
+            {{ form.name(autofocus=true) }}
+            {% for e in form.name.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                {{ form.date.label }}
+                {{ form.date(type="date") }}
+                {% for e in form.date.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ form.start_time.label }}
+                {{ form.start_time(type="time") }}
+                {% for e in form.start_time.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ form.end_time.label }}
+                {{ form.end_time(type="time") }}
+                {% for e in form.end_time.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+        </div>
+
+        <div class="field">
+            <label for="project_id">{{ form.project_id.label.text }} <span class="required-mark">*</span></label>
+            {{ form.project_id(id="project_id") }}
+            {% for e in form.project_id.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            {{ form.category_id.label }}
+            {{ form.category_id() }}
+        </div>
+
+        <div class="form-actions">
+            <a class="btn btn-ghost" href="{{ url_for('meetings.list_meetings') }}">Annuler</a>
+            <button form="meeting-delete-form" class="btn btn-danger" type="submit"
+                    onclick="return confirm('Supprimer la réunion « {{ meeting.name }} » ?');">
+                Supprimer
+            </button>
+            <button class="btn btn-primary" type="submit">Enregistrer</button>
+        </div>
+    </form>
+
+    <form id="meeting-delete-form" method="post"
+          action="{{ url_for('meetings.delete_meeting', meeting_id=meeting.id) }}"
+          style="display:none">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+</section>
+{% endblock %}

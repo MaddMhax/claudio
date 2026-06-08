@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% set is_absence = (category == 'absence') %}
+{% set noun = "type d'absence" if is_absence else "type de mission" %}
+{% set list_ep = 'mission_types.list_absence_types' if is_absence else 'mission_types.list_types' %}
+{% block title %}{{ ('Modifier' if mode == 'edit' else 'Nouveau ' ~ noun) }} — Claudio{% endblock %}
+{% block content %}
+<section class="form-card">
+    <h1>{{ ('Modifier le ' ~ noun) if mode == 'edit' else ('Nouveau ' ~ noun) }}</h1>
+
+    <small class="hint" style="display:block;margin-bottom:14px">
+        {% if is_absence %}
+            Toujours bloquant, sans client ni spécialité. Assignable à n'importe quel collaborateur.
+        {% else %}
+            Toujours bloquant, rattaché à un client et porteur d'une spécialité via son sous-type.
+        {% endif %}
+    </small>
+
+    <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+
+        <div class="field">
+            {{ form.name.label }}
+            {{ form.name(autofocus=true) }}
+            {% for e in form.name.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            {{ form.color.label }}
+            {{ form.color(type="color") }}
+            {% for e in form.color.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            {{ form.description.label }}
+            {{ form.description(rows=3) }}
+            {% for e in form.description.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="form-actions">
+            <a class="btn btn-ghost" href="{{ url_for(list_ep) }}">Annuler</a>
+            <button class="btn btn-primary" type="submit">{{ 'Enregistrer' if mode == 'edit' else 'Créer' }}</button>
+        </div>
+    </form>
+</section>
+
+{% if mode == 'edit' and not is_absence %}
+<section class="form-card form-card-wide" style="margin-top:18px">
+    <h2 style="margin-top:0">Sous-types</h2>
+    <small class="hint" style="display:block;margin-bottom:14px">
+        Un sous-type affine le type de mission (ex. <em>Audit</em> ou <em>Retest</em>).
+        Une spécialité (web / mobile / code) peut être attachée à un sous-type — l'événement en hérite.
+        Un sous-type est obligatoire à la création d'un événement de ce type.
+    </small>
+
+    {% if subtypes %}
+    <table class="users-table">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Nom</th>
+                <th>Spécialité</th>
+                <th class="users-table-actions">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for sub in subtypes %}
+            <tr>
+                <td><span class="user-dot" style="--user-color: {{ sub.color }}"></span></td>
+                <td><strong>{{ sub.name }}</strong></td>
+                <td>
+                    {% if sub.role %}
+                        <span class="role-tag" style="background:color-mix(in srgb, {{ sub.role.color }} 18%, transparent);border-color:{{ sub.role.color }}">{{ sub.role.label }}</span>
+                    {% else %}
+                        <span class="cell-dim">—</span>
+                    {% endif %}
+                </td>
+                <td class="users-table-actions">
+                    <a class="btn btn-ghost" href="{{ url_for('mission_types.edit_subtype', type_id=mission_type.id, sub_id=sub.id) }}">Modifier</a>
+                    <form method="post" action="{{ url_for('mission_types.delete_subtype', type_id=mission_type.id, sub_id=sub.id) }}"
+                          class="inline-form"
+                          onsubmit="return confirm('Supprimer le sous-type « {{ sub.name }} » ?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-danger" type="submit">Supprimer</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="cell-dim" style="padding:8px 0 16px">Aucun sous-type pour ce type de mission.</div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('mission_types.create_subtype', type_id=mission_type.id) }}" style="margin-top:18px">
+        {{ subtype_form.hidden_tag() }}
+        <h3 style="margin-bottom:8px">Ajouter un sous-type</h3>
+        <div class="field-row">
+            <div class="field">
+                {{ subtype_form.name.label }}
+                {{ subtype_form.name(placeholder="Audit, Retest, ...") }}
+            </div>
+            <div class="field">
+                {{ subtype_form.color.label }}
+                {{ subtype_form.color(type="color") }}
+            </div>
+            <div class="field">
+                {{ subtype_form.role_id.label }}
+                {{ subtype_form.role_id() }}
+                <small class="hint">Géré dans <a href="{{ url_for('users.list_users') }}">Utilisateurs → Rôles</a>.</small>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">+ Ajouter</button>
+        </div>
+    </form>
+</section>
+{% endif %}
+{% endblock %}

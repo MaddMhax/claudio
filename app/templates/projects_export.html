@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Exporter des projets — Claudio{% endblock %}
+{% block content %}
+<section class="calendar-toolbar">
+    <h1 class="cal-title">Exporter des projets</h1>
+    <div class="cal-actions">
+        <a class="btn btn-ghost" href="{{ url_for('projects.projects_list') }}">← Retour aux projets</a>
+    </div>
+</section>
+
+<section class="form-card form-card-wide">
+    <h2 style="margin-top:0">1. Filtrer la liste des projets</h2>
+    <p class="cell-dim" style="margin-top:0">
+        Restreignez les projets affichés ci-dessous par période et/ou client. Les
+        missions, réunions et tâches exportées seront elles aussi restreintes à
+        la période choisie.
+    </p>
+    <form method="get" action="{{ url_for('projects.export_form') }}">
+        <div class="field-row">
+            <div class="field">
+                <label for="filter-year">Année</label>
+                <select id="filter-year" name="year">
+                    <option value="">— toutes —</option>
+                    {% for y in years %}
+                    <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="filter-month">Mois</label>
+                <select id="filter-month" name="month">
+                    <option value="">— tous —</option>
+                    {% for num, label in months %}
+                    <option value="{{ num }}" {% if selected_month == num %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <small class="hint">Nécessite une année.</small>
+            </div>
+            <div class="field">
+                <label for="filter-client">Client</label>
+                <select id="filter-client" name="client_id">
+                    <option value="">— tous —</option>
+                    {% for c in clients %}
+                    <option value="{{ c.id }}" {% if selected_client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-actions">
+            <a class="btn btn-ghost" href="{{ url_for('projects.export_form') }}">Réinitialiser</a>
+            <button class="btn btn-primary" type="submit">Appliquer les filtres</button>
+        </div>
+    </form>
+</section>
+
+<section class="form-card form-card-wide" style="margin-top:18px">
+    <h2 style="margin-top:0">2. Choisir les projets puis exporter</h2>
+    {% if projects %}
+    <form method="get" action="{{ url_for('projects.export_csv_all') }}">
+        {# Carry the period filter into the CSV endpoint so the items are filtered too. #}
+        {% if selected_year %}<input type="hidden" name="year" value="{{ selected_year }}">{% endif %}
+        {% if selected_month %}<input type="hidden" name="month" value="{{ selected_month }}">{% endif %}
+
+        <table class="users-table">
+            <thead>
+                <tr>
+                    <th style="width:32px">
+                        <input type="checkbox" id="select-all" checked
+                               aria-label="Tout sélectionner">
+                    </th>
+                    <th>Projet</th>
+                    <th>Client</th>
+                    <th>Statut</th>
+                    <th class="cell-num">Missions</th>
+                    <th class="cell-num">Réunions</th>
+                    <th class="cell-num">Tâches</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in projects %}
+                <tr>
+                    <td>
+                        <input type="checkbox" name="project_ids" value="{{ p.id }}"
+                               class="project-pick" checked>
+                    </td>
+                    <td><strong>{{ p.name }}</strong>
+                        {% if p.code %}<div class="cell-dim" style="font-size:0.85em">{{ p.code }}</div>{% endif %}
+                    </td>
+                    <td>{{ p.client.name }}</td>
+                    <td>
+                        <span class="status-pill status-{{ 'planifie' if p.status == 'actif' else 'termine' }}">
+                            {{ 'Actif' if p.status == 'actif' else 'Clos' }}
+                        </span>
+                    </td>
+                    <td class="cell-num">{{ p.missions|length }}</td>
+                    <td class="cell-num">{{ p.meetings|length }}</td>
+                    <td class="cell-num">{{ p.tasks|length }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="form-actions" style="margin-top:14px">
+            <button class="btn btn-primary" type="submit">⬇ Exporter (CSV)</button>
+            <small class="hint" style="margin-left:8px">
+                Format multi-sections : missions, réunions, tâches — séparateur <code>;</code>, BOM UTF-8 pour Excel.
+            </small>
+        </div>
+    </form>
+
+    <script nonce="{{ csp_nonce }}">
+        (function () {
+            var all = document.getElementById('select-all');
+            var picks = document.querySelectorAll('.project-pick');
+            if (!all) return;
+            all.addEventListener('change', function () {
+                picks.forEach(function (cb) { cb.checked = all.checked; });
+            });
+            picks.forEach(function (cb) {
+                cb.addEventListener('change', function () {
+                    var all_checked = Array.prototype.every.call(picks, function (x) { return x.checked; });
+                    all.checked = all_checked;
+                });
+            });
+        })();
+    </script>
+    {% else %}
+    <div class="empty-state" style="padding:24px">
+        Aucun projet ne correspond aux filtres.
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

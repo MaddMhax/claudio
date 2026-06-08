@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Modifier' if mode == 'edit' else 'Nouvel utilisateur' }} — Claudio{% endblock %}
+{% block content %}
+<section class="form-card">
+    <h1>{{ 'Modifier l’utilisateur' if mode == 'edit' else 'Nouvel utilisateur' }}</h1>
+
+    <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+
+        <div class="field">
+            {{ form.username.label }}
+            {{ form.username(autofocus=true, autocomplete="username") }}
+            {% for e in form.username.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            {{ form.full_name.label }}
+            {{ form.full_name() }}
+            {% for e in form.full_name.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                {{ form.roles.label }}
+                {{ form.roles(size=5) }}
+                <small class="hint">Maintenez Ctrl / Cmd pour sélectionner plusieurs rôles.</small>
+                {% for e in form.roles.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ form.color.label }}
+                {{ form.color(type="color") }}
+                {% for e in form.color.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+        </div>
+
+        <div class="field">
+            {{ form.password.label }}
+            {{ form.password(autocomplete="new-password",
+                              placeholder='Laisser vide pour conserver le mot de passe actuel' if mode == 'edit' else '') }}
+            <small class="hint">Au moins 8 caractères. {% if mode == 'edit' %}Laisser vide pour ne pas changer.{% endif %}</small>
+            {% for e in form.password.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="form-actions">
+            <a class="btn btn-ghost" href="{{ url_for('users.list_users') }}">Annuler</a>
+            <button class="btn btn-primary" type="submit">
+                {{ 'Enregistrer' if mode == 'edit' else 'Créer l’utilisateur' }}
+            </button>
+        </div>
+    </form>
+</section>
+{% endblock %}

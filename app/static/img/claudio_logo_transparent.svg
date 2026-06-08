@@ -1,0 +1,24 @@
+<svg width="512" height="512" viewBox="146.0 86.0 294.0 294.0" xmlns="http://www.w3.org/2000/svg">
+    <g stroke="#0a1620" stroke-width="1.5" stroke-linejoin="round">
+      <path d="M175 300 L165 250 L205 235 L215 285 Z" fill="#0f6f56"/>
+      <path d="M165 250 L180 200 L225 200 L205 235 Z" fill="#168a66"/>
+      <path d="M180 200 L215 165 L255 185 L225 200 Z" fill="#1fa878"/>
+      <path d="M215 165 L270 155 L290 188 L255 185 Z" fill="#19926f"/>
+      <path d="M255 185 L290 188 L300 230 L260 240 Z" fill="#23b884"/>
+      <path d="M225 200 L255 185 L260 240 L215 285 L205 235 Z" fill="#15876a"/>
+      <path d="M260 240 L300 230 L312 270 L270 282 Z" fill="#1aa179"/>
+      <path d="M215 285 L260 240 L270 282 L235 305 Z" fill="#0f6f56"/>
+      <path d="M290 188 L335 175 L345 210 L300 230 Z" fill="#27c98f"/>
+      <path d="M335 175 L378 188 L362 222 L345 210 Z" fill="#1fa878"/>
+      <path d="M345 210 L362 222 L350 258 L312 270 L300 230 Z" fill="#168a66"/>
+      <path d="M378 188 C405 182, 420 205, 410 228 C402 246, 380 248, 372 232" fill="none" stroke="#1aa179" stroke-width="11" stroke-linecap="round"/>
+      <path d="M270 155 L300 140 L335 175 L290 188 Z" fill="#2ad494"/>
+      <path d="M300 140 L345 148 L335 175 Z" fill="#1fa878"/>
+    </g>
+    <polygon points="320,192 348,184 356,210 332,222" fill="#0c1c29" stroke="#0a1620" stroke-width="1.5"/>
+    <circle cx="340" cy="202" r="8" fill="#7fe3c0"/>
+    <circle cx="342" cy="199" r="2.8" fill="#0c1c29"/>
+    <rect x="200" y="298" width="26" height="26" rx="4" fill="#3aa5c9" stroke="#0a1620" stroke-width="1.5"/>
+    <rect x="232" y="298" width="26" height="26" rx="4" fill="#e0a23a" stroke="#0a1620" stroke-width="1.5"/>
+    <rect x="264" y="298" width="26" height="26" rx="4" fill="#e07a5f" stroke="#0a1620" stroke-width="1.5"/>
+</svg>

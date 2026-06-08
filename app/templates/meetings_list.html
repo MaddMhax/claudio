@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% block title %}Réunions — Claudio{% endblock %}
+{% block content %}
+
+<section class="calendar-toolbar">
+    <h1 class="cal-title">Réunions</h1>
+</section>
+
+<details class="form-card form-card-wide" open>
+    <summary class="form-card-summary">+ Nouvelle réunion</summary>
+    <form method="post" action="{{ url_for('meetings.create_meeting') }}" novalidate>
+        {{ form.hidden_tag() }}
+        <div class="field">
+            {{ form.name.label }}
+            {{ form.name(autofocus=true) }}
+            {% for e in form.name.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+        <div class="field-row">
+            <div class="field">
+                {{ form.date.label }}
+                {{ form.date(type="date") }}
+                {% for e in form.date.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ form.start_time.label }}
+                {{ form.start_time(type="time") }}
+                {% for e in form.start_time.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ form.end_time.label }}
+                {{ form.end_time(type="time") }}
+                {% for e in form.end_time.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ form.category_id.label }}
+                {{ form.category_id() }}
+            </div>
+        </div>
+        <small class="hint" style="display:block;margin:-6px 0 8px">
+            Heures facultatives — laissez les deux vides pour une réunion sans horaire précis.
+        </small>
+
+        <div class="field">
+            <label for="project_id">{{ form.project_id.label.text }} <span class="required-mark">*</span></label>
+            {{ form.project_id(id="project_id") }}
+            <small class="hint">Toute réunion appartient à un projet client.
+                <a href="{{ url_for('projects.projects_list') }}" target="_blank" rel="noopener">Gérer les projets ↗</a>
+            </small>
+            {% for e in form.project_id.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            <label class="checkbox-inline">
+                {{ form.create_followup_task(id="create_followup_task") }}
+                <span>{{ form.create_followup_task.label.text }}</span>
+            </label>
+        </div>
+        <div id="followup-task-wrap" hidden>
+            <div class="field-row">
+                <div class="field" style="flex:2">
+                    {{ form.followup_template_id.label }}
+                    {{ form.followup_template_id(id="followup_template_id") }}
+                    {% for e in form.followup_template_id.errors %}<small class="err">{{ e }}</small>{% endfor %}
+                </div>
+                <div class="field" style="flex:1">
+                    {{ form.followup_offset_days.label }}
+                    {{ form.followup_offset_days(type="number", min=0, max=365, id="followup_offset_days") }}
+                    {% for e in form.followup_offset_days.errors %}<small class="err">{{ e }}</small>{% endfor %}
+                </div>
+            </div>
+            <small class="hint">Une copie sera créée avec le statut « À faire », la date = réunion + N jours ouvrés (week-ends et jours fériés exclus), et le nom de la réunion sera ajouté en suffixe. Par défaut : {{ followup_days }}. <a href="{{ url_for('tasks.list_tasks') }}" target="_blank" rel="noopener">Gérer les modèles ↗</a></small>
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Créer la réunion</button>
+        </div>
+    </form>
+</details>
+
+<script nonce="{{ csp_nonce }}">
+(function () {
+    var toggle = document.getElementById('create_followup_task');
+    var wrap = document.getElementById('followup-task-wrap');
+    var select = document.getElementById('followup_template_id');
+    var days = document.getElementById('followup_offset_days');
+    if (!toggle || !wrap || !select) return;
+    function refresh() {
+        wrap.hidden = !toggle.checked;
+        select.disabled = !toggle.checked;
+        if (days) days.disabled = !toggle.checked;
+        if (toggle.checked) select.focus();
+    }
+    toggle.addEventListener('change', refresh);
+    refresh();
+})();
+</script>
+
+<table class="users-table" style="margin-top:18px">
+    <thead>
+        <tr>
+            <th>Nom</th>
+            <th>Projet</th>
+            <th>Date</th>
+            <th>Horaire</th>
+            <th>Type</th>
+            <th class="users-table-actions">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for m in meetings %}
+        <tr>
+            <td><strong>{{ m.name }}</strong></td>
+            <td>
+                <a href="{{ url_for('projects.project_detail', project_id=m.project_id) }}">
+                    {{ m.project.client.name }} — {{ m.project.name }}
+                </a>
+            </td>
+            <td>{{ m.date.strftime('%d/%m/%Y') }}</td>
+            <td>
+                {% if m.start_time and m.end_time %}
+                    {{ m.start_time.strftime('%H:%M') }} → {{ m.end_time.strftime('%H:%M') }}
+                {% else %}
+                    <span class="cell-dim">—</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if m.category %}
+                    <span class="task-status-pill" style="--status-color: {{ m.category.color }}">{{ m.category.name }}</span>
+                {% else %}
+                    <span class="cell-dim">— aucun —</span>
+                {% endif %}
+            </td>
+            <td class="users-table-actions">
+                <a class="btn btn-ghost" href="{{ url_for('meetings.edit_meeting', meeting_id=m.id) }}">Modifier</a>
+                <form method="post" action="{{ url_for('meetings.delete_meeting', meeting_id=m.id) }}"
+                      class="inline-form"
+                      onsubmit="return confirm('Supprimer la réunion « {{ m.name }} » ?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-danger" type="submit">Supprimer</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="cell-dim" style="text-align:center;padding:24px">Aucune réunion pour le moment.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if current_user.is_admin %}
+<details class="form-card form-card-wide" style="margin-top:24px">
+    <summary class="form-card-summary">Modèles de tâches de suivi ({{ followup_templates|length }})</summary>
+    <p class="cell-dim" style="margin-top:8px">
+        Ces modèles peuplent la liste « Tâche de suivi » du formulaire ci-dessus.
+        Chaque fois qu'une réunion est créée avec une tâche de suivi, une copie
+        du modèle est instanciée pour le projet de la réunion.
+    </p>
+
+    <table class="users-table">
+        <thead>
+            <tr>
+                <th>Nom du modèle</th>
+                <th>Auto après mission</th>
+                <th>Délai (j ouvrés)</th>
+                <th class="users-table-actions">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in followup_templates %}
+            <tr>
+                <td><strong>{{ t.name }}</strong></td>
+                <td>
+                    {% if t.auto_after_mission %}
+                        <span class="role-tag" style="background:rgba(34,197,94,0.15);border-color:#22c55e;color:#86efac">Oui</span>
+                    {% else %}
+                        <span class="cell-dim">non</span>
+                    {% endif %}
+                </td>
+                <td>{{ t.auto_offset_days }}</td>
+                <td class="users-table-actions">
+                    <a class="btn btn-ghost" href="{{ url_for('tasks.edit_task', task_id=t.id) }}">Modifier</a>
+                    <form method="post" action="{{ url_for('tasks.delete_task', task_id=t.id) }}"
+                          class="inline-form"
+                          onsubmit="return confirm('Supprimer le modèle « {{ t.name }} » ?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-danger" type="submit">Supprimer</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="cell-dim" style="text-align:center;padding:18px">Aucun modèle. Créez-en un ci-dessous.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <form method="post" action="{{ url_for('meetings.create_followup_template') }}" novalidate style="margin-top:14px">
+        {{ followup_form.hidden_tag() }}
+        <div class="field-row">
+            <div class="field" style="flex:1">
+                {{ followup_form.name.label }}
+                {{ followup_form.name(placeholder='Ex : Compte-rendu, Relance client…') }}
+                {% for e in followup_form.name.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">+ Nouveau modèle</button>
+            <small class="hint" style="margin-left:8px">
+                Pour les options avancées (description, déclenchement auto, délai), utilisez « Modifier » après création.
+            </small>
+        </div>
+    </form>
+</details>
+
+<details class="form-card form-card-wide" style="margin-top:18px">
+    <summary class="form-card-summary">Types de réunion ({{ categories|length }})</summary>
+
+    <table class="users-table">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Nom</th>
+                <th>Réunions</th>
+                <th class="users-table-actions">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for c in categories %}
+            <tr>
+                <td><span class="user-dot" style="--user-color: {{ c.color }}"></span></td>
+                <td><strong>{{ c.name }}</strong></td>
+                <td>{{ c.meetings|length }}</td>
+                <td class="users-table-actions">
+                    <a class="btn btn-ghost" href="{{ url_for('meetings.edit_category', category_id=c.id) }}">Modifier</a>
+                    <form method="post" action="{{ url_for('meetings.delete_category', category_id=c.id) }}"
+                          class="inline-form"
+                          onsubmit="return confirm('Supprimer le type « {{ c.name }} » ? {% if c.meetings %}{{ c.meetings|length }} réunion(s) perdront leur type.{% endif %}');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-danger" type="submit">Supprimer</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="cell-dim" style="text-align:center;padding:18px">Aucun type. Créez-en un ci-dessous.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <form method="post" action="{{ url_for('meetings.create_category') }}" novalidate style="margin-top:14px">
+        {{ category_form.hidden_tag() }}
+        <div class="field-row">
+            <div class="field">
+                {{ category_form.name.label }}
+                {{ category_form.name() }}
+                {% for e in category_form.name.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ category_form.color.label }}
+                {{ category_form.color(type="color") }}
+                {% for e in category_form.color.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">+ Nouveau type</button>
+        </div>
+    </form>
+</details>
+{% endif %}
+
+{% endblock %}

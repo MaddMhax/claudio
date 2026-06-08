@@ -1,0 +1,58 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: planning_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-planner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-plannerpass}
+      POSTGRES_DB: ${POSTGRES_DB:-planning}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      # Bound to localhost so Postgres isn't reachable from the LAN. Drop this
+      # mapping entirely if you don't need host-side psql access.
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-planner} -d ${POSTGRES_DB:-planning}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: .
+    container_name: planning_web
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-planner}:${POSTGRES_PASSWORD:-plannerpass}@db:5432/${POSTGRES_DB:-planning}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-prod-please-use-a-long-random-string}
+      FLASK_ENV: production
+      # Plain-HTTP demo on localhost: opt out of Secure cookies so login works.
+      # Real HTTPS deployment: unset this var (or set to 0).
+      ALLOW_INSECURE_COOKIE: ${ALLOW_INSECURE_COOKIE:-1}
+      # Set BEHIND_PROXY=1 when fronted by an HTTPS-terminating reverse proxy
+      # so X-Forwarded-* are honored (needed for Secure cookies to work).
+      BEHIND_PROXY: ${BEHIND_PROXY:-0}
+      # Set DISABLE_DEFAULT_SEED=1 in production to refuse the public-password
+      # seed team — you'll then bootstrap the first admin manually.
+      DISABLE_DEFAULT_SEED: ${DISABLE_DEFAULT_SEED:-0}
+      # Content-Security-Policy starts in report-only (1) so a missed inline
+      # script can't break the app; set to 0 to enforce once validated.
+      CSP_REPORT_ONLY: ${CSP_REPORT_ONLY:-1}
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz').status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    command: >
+      sh -c "python -m app.init_db && gunicorn -w 2 -b 0.0.0.0:8000 'app:create_app()'"
+
+volumes:
+  db_data:

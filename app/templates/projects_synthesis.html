@@ -1,0 +1,257 @@
+{% extends "base.html" %}
+{% block title %}Synthèse des projets — Claudio{% endblock %}
+{% block content %}
+<section class="calendar-toolbar">
+    <h1 class="cal-title">Synthèse des projets</h1>
+    <div class="cal-actions">
+        <a class="btn btn-ghost" href="{{ url_for('projects.projects_list') }}">← Liste des projets</a>
+    </div>
+</section>
+
+<section class="form-card form-card-wide" style="margin-bottom:14px">
+    <form method="get" action="{{ url_for('projects.projects_synthesis') }}">
+        <div class="field-row">
+            <div class="field">
+                <label for="synth-year">Année</label>
+                <select id="synth-year" name="year">
+                    <option value="">— toutes —</option>
+                    {% for y in years_available %}
+                    <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label for="synth-client">Client</label>
+                <select id="synth-client" name="client_id">
+                    <option value="">— tous —</option>
+                    {% for c in clients_available %}
+                    <option value="{{ c.id }}" {% if selected_client_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="form-actions" style="margin-top:8px">
+            <a class="btn btn-ghost" href="{{ url_for('projects.projects_synthesis') }}">Réinitialiser</a>
+            <a class="btn btn-ghost {% if selected_year == current_year and not selected_client_id %}is-active{% endif %}"
+               href="{{ url_for('projects.projects_synthesis', year=current_year) }}">
+                Année en cours ({{ current_year }})
+            </a>
+            <button class="btn btn-primary" type="submit">Appliquer</button>
+        </div>
+        {% if selected_year or selected_client_id %}
+        <small class="hint" style="display:block;margin-top:8px">
+            Filtre actif{% if selected_year %} — année <strong>{{ selected_year }}</strong>{% endif %}{% if selected_client_id %}{% for c in clients_available if c.id == selected_client_id %} — client <strong>{{ c.name }}</strong>{% endfor %}{% endif %}.
+            Toutes les sections ci-dessous (résumé, mois, pentesters, clients) sont restreintes à ce périmètre.
+        </small>
+        {% endif %}
+    </form>
+</section>
+
+<section class="projects-summary">
+    <div class="summary-card">
+        <div class="summary-num">{{ summary.total }}</div>
+        <div class="summary-lbl">Missions au total</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-num">{{ summary.total_person_days }}</div>
+        <div class="summary-lbl">Jours / homme cumulés</div>
+    </div>
+    {% for key, label, count in summary.by_status %}
+    <div class="summary-card summary-card-{{ key }}">
+        <div class="summary-num">{{ count }}</div>
+        <div class="summary-lbl">{{ label }}</div>
+    </div>
+    {% endfor %}
+</section>
+
+<section class="monthly-pd export-card">
+    <div class="monthly-pd-head">
+        <h2>Export CSV</h2>
+        <p class="cell-dim" style="margin:4px 0 0; font-size:0.9rem;">
+            Format : <code>Projet ; Date de début ; Date de fin ; Jours/homme</code>
+            (séparateur <code>;</code>, BOM UTF-8 pour Excel).
+        </p>
+    </div>
+
+    <div class="export-actions">
+        <form method="get" action="{{ url_for('projects.projects_export_csv') }}" class="export-form">
+            <span class="export-form-label">Toutes les missions :</span>
+            <button class="btn btn-primary" type="submit">⬇ Exporter tout</button>
+        </form>
+
+        {% if months_available %}
+        <form method="get" action="{{ url_for('projects.projects_export_csv') }}" class="export-form">
+            <label for="export-month" class="export-form-label">Mois précis :</label>
+            <select id="export-month" name="month" required>
+                {% for m in months_available %}
+                <option value="{{ m.key }}">{{ m.label }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-primary" type="submit">⬇ Exporter ce mois</button>
+            <small class="hint" style="flex-basis:100%; margin-top:6px;">
+                J/H comptés sur les jours ouvrés (lun-ven) qui tombent réellement dans le mois choisi × nombre de pentesters.
+            </small>
+        </form>
+        {% else %}
+        <p class="cell-dim" style="margin:0;">Aucun mois disponible — créez une mission d'audit pour activer l'export mensuel.</p>
+        {% endif %}
+    </div>
+</section>
+
+{% if monthly %}
+<section class="monthly-pd">
+    <div class="monthly-pd-head">
+        <h2>Jours / homme cumulés — mois par mois</h2>
+    </div>
+    <table class="monthly-pd-table">
+        <tbody>
+            {% for row in monthly %}
+            <tr>
+                <td class="mpd-label">{{ row.label }}</td>
+                <td class="mpd-bar">
+                    <span style="width: {{ (row.person_days / monthly_max * 100)|round(1) }}%"></span>
+                </td>
+                <td class="mpd-num">{{ row.person_days }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+{% if pentester.rows %}
+<section class="monthly-pd pentester-pd">
+    <div class="monthly-pd-head">
+        <h2>Charge par pentester</h2>
+        <p class="cell-dim" style="margin:4px 0 0; font-size:0.9rem;">
+            Jours travaillés sur des missions d'audit, du lundi au vendredi.
+            Total cumulé : <strong>{{ pentester.grand_total }}</strong> J/H.
+        </p>
+    </div>
+
+    <table class="monthly-pd-table" style="margin-bottom: 18px;">
+        <tbody>
+            {% for row in pentester.rows %}
+            <tr>
+                <td class="mpd-label">
+                    <span class="user-dot" style="--user-color: {{ row.user.color }}; vertical-align: middle; margin-right: 6px;"></span>
+                    {{ row.user.full_name }}
+                </td>
+                <td class="mpd-bar">
+                    <span style="width: {{ (row.total / pentester.max_total * 100)|round(1) if pentester.max_total else 0 }}%; background: {{ row.user.color }};"></span>
+                </td>
+                <td class="mpd-num">{{ row.total }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="projects-table-wrap">
+    <table class="users-table heatmap-table">
+        <thead>
+            <tr>
+                <th>Pentester</th>
+                {% for m in pentester.months %}
+                <th class="cell-num heatmap-month">{{ m.label }}</th>
+                {% endfor %}
+                <th class="cell-num">Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in pentester.rows %}
+            <tr>
+                <td>
+                    <span class="user-chip" style="--user-color: {{ row.user.color }}">
+                        <span class="user-dot" style="--user-color: {{ row.user.color }}"></span>
+                        {{ row.user.full_name }}
+                    </span>
+                </td>
+                {% for value in row.cells %}
+                <td class="cell-num heatmap-cell"
+                    style="--heat: {{ (value / pentester.max_cell)|round(3) if pentester.max_cell else 0 }}; --user-color: {{ row.user.color }};">
+                    {% if value %}{{ value }}{% else %}<span class="cell-dim">·</span>{% endif %}
+                </td>
+                {% endfor %}
+                <td class="cell-num"><strong>{{ row.total }}</strong></td>
+            </tr>
+            {% endfor %}
+            <tr class="heatmap-totals">
+                <td class="cell-dim">Total mensuel</td>
+                {% for total in pentester.totals_by_month %}
+                <td class="cell-num"><strong>{{ total }}</strong></td>
+                {% endfor %}
+                <td class="cell-num"><strong>{{ pentester.grand_total }}</strong></td>
+            </tr>
+        </tbody>
+    </table>
+    </div>
+</section>
+{% endif %}
+
+{% if client.rows %}
+<section class="monthly-pd client-pd">
+    <div class="monthly-pd-head">
+        <h2>Charge par client</h2>
+        <p class="cell-dim" style="margin:4px 0 0; font-size:0.9rem;">
+            {{ client.client_count }} client{{ 's' if client.client_count > 1 else '' }} identifié{{ 's' if client.client_count > 1 else '' }}
+            · <strong>{{ client.named_person_days }}</strong>/{{ client.total_person_days }} J/H rattachés à un client.
+        </p>
+    </div>
+
+    <table class="monthly-pd-table" style="margin-bottom: 18px;">
+        <tbody>
+            {% for row in client.rows %}
+            <tr {% if row.client_id is none %}class="cell-dim"{% endif %}>
+                <td class="mpd-label">
+                    {% if row.client_id %}
+                        <strong>{{ row.name }}</strong>
+                    {% else %}
+                        <em>{{ row.name }}</em>
+                    {% endif %}
+                </td>
+                <td class="mpd-bar">
+                    <span style="width: {{ (row.person_days / client.max_person_days * 100)|round(1) if client.max_person_days else 0 }}%"></span>
+                </td>
+                <td class="mpd-num">{{ row.person_days }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="projects-table-wrap">
+    <table class="users-table">
+        <thead>
+            <tr>
+                <th>Client</th>
+                <th class="cell-num">Missions</th>
+                <th class="cell-num" title="2 pentesters sur une journée = 2 jours">J/H</th>
+                <th>Spécialités</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in client.rows %}
+            <tr>
+                <td>
+                    {% if row.client_id %}
+                        <strong>{{ row.name }}</strong>
+                    {% else %}
+                        <span class="cell-dim"><em>{{ row.name }}</em></span>
+                    {% endif %}
+                </td>
+                <td class="cell-num">{{ row.mission_count }}</td>
+                <td class="cell-num"><strong>{{ row.person_days }}</strong></td>
+                <td>
+                    {% for k in row.kinds %}
+                        <span class="role-tag">{{ k }}</span>
+                    {% else %}
+                        <span class="cell-dim">—</span>
+                    {% endfor %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+</section>
+{% endif %}
+{% endblock %}

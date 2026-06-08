@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}API d'intégration — Claudio{% endblock %}
+{% block content %}
+
+<section class="calendar-toolbar">
+    <h1 class="cal-title">API d'intégration</h1>
+    <a class="btn btn-ghost" href="{{ swagger_url }}">📖 Documentation Swagger</a>
+</section>
+
+<section class="form-card form-card-wide">
+    <p class="cell-dim" style="margin-top:0">
+        L'API expose en <strong>lecture seule</strong> les données du planning pour des outils
+        externes (ex. import Pwndoc). Chaque appel s'authentifie par un jeton porteur :
+        <code>Authorization: Bearer &lt;jeton&gt;</code>. Les jetons sont stockés
+        <strong>hachés</strong> — la valeur en clair n'est affichée qu'une seule fois, à la création.
+    </p>
+</section>
+
+{% if new_token %}
+<section class="form-card form-card-wide" style="margin-top:14px;border-color:var(--accent)">
+    <h2 style="margin-top:0">✅ Nouveau jeton — copiez-le maintenant</h2>
+    <p class="cell-dim" style="margin-top:0">
+        Cette valeur ne sera <strong>plus jamais</strong> affichée. Conservez-la dans le coffre
+        de votre intégration.
+    </p>
+    <pre class="token-reveal"><code>{{ new_token }}</code></pre>
+    <p class="cell-dim" style="margin-top:8px">Exemple d'appel :</p>
+    <pre class="token-reveal"><code>curl -s -H "Authorization: Bearer {{ new_token }}" \
+  {{ request.url_root }}api/v1/projects</code></pre>
+</section>
+{% endif %}
+
+<section class="form-card form-card-wide" style="margin-top:14px">
+    <h2 style="margin-top:0">Créer un jeton</h2>
+    <form method="post" action="{{ url_for('api_admin.list_tokens') }}">
+        {{ form.csrf_token }}
+        <div class="field-row">
+            <div class="field" style="flex:1">
+                {{ form.label.label }}
+                {{ form.label(placeholder="Ex : Pwndoc production") }}
+                {% for e in form.label.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field" style="flex:0 0 auto;align-self:flex-end">
+                <button class="btn btn-primary" type="submit">Générer</button>
+            </div>
+        </div>
+    </form>
+</section>
+
+<section class="form-card form-card-wide" style="margin-top:14px">
+    <h2 style="margin-top:0">Jetons existants</h2>
+    {% if tokens %}
+    <table class="users-table">
+        <thead>
+            <tr>
+                <th>Libellé</th><th>Portée</th><th>Créé le</th>
+                <th>Dernier appel</th><th>Statut</th><th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in tokens %}
+            <tr>
+                <td><strong>{{ t.label }}</strong></td>
+                <td><span class="role-tag">{{ t.scope_label }}</span></td>
+                <td>{{ t.created_at | localdt }}</td>
+                <td>{{ (t.last_used_at | localdt) or '—' }}</td>
+                <td>
+                    {% if t.active %}
+                        <span class="status-pill status-planifie">Actif</span>
+                    {% else %}
+                        <span class="status-pill status-preplanifie">Révoqué</span>
+                    {% endif %}
+                </td>
+                <td class="users-table-actions">
+                    {% if t.active %}
+                    <form method="post" class="inline-form"
+                          action="{{ url_for('api_admin.revoke_token', token_id=t.id) }}"
+                          onsubmit="return confirm('Révoquer ce jeton ? Les intégrations qui l’utilisent cesseront de fonctionner.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-danger" type="submit">Révoquer</button>
+                    </form>
+                    {% else %}
+                    <span class="cell-dim">—</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state" style="padding:18px;margin-top:10px">
+        Aucun jeton pour le moment.
+    </p>
+    {% endif %}
+</section>
+
+{% endblock %}

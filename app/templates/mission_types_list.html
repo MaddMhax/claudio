@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% set is_absence = (category == 'absence') %}
+{% set page_title = "Types d'absence" if is_absence else "Types de mission" %}
+{% set create_ep = 'mission_types.create_absence_type' if is_absence else 'mission_types.create_type' %}
+{% set edit_ep = 'mission_types.edit_absence_type' if is_absence else 'mission_types.edit_type' %}
+{% set delete_ep = 'mission_types.delete_absence_type' if is_absence else 'mission_types.delete_type' %}
+{% block title %}{{ page_title }} — Claudio{% endblock %}
+{% block content %}
+<section class="calendar-toolbar">
+    <h1 class="cal-title">{{ page_title }}</h1>
+    <div class="cal-actions">
+        <a class="btn btn-primary" href="{{ url_for(create_ep) }}">+ Nouveau type</a>
+    </div>
+</section>
+
+<small class="hint" style="display:block;margin-bottom:14px">
+    {% if is_absence %}
+        Absences internes (Congé, Formation…). Toujours bloquantes, sans client ni spécialité,
+        et assignables à n'importe quel collaborateur (technique ou non).
+    {% else %}
+        Missions techniques (Audit, Retest…). Toujours bloquantes, rattachées à un client et
+        porteuses d'une spécialité via leur sous-type obligatoire.
+    {% endif %}
+</small>
+
+<table class="users-table">
+    <thead>
+        <tr>
+            <th></th>
+            <th>Nom</th>
+            <th>Description</th>
+            <th>Événements liés</th>
+            <th class="users-table-actions">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for mt in types %}
+        <tr>
+            <td><span class="user-dot" style="--user-color: {{ mt.color }}"></span></td>
+            <td>
+                <strong>{{ mt.name }}</strong>
+            </td>
+            <td class="cell-dim">
+                {{ mt.description or '—' }}
+                {% if not is_absence and mt.subtypes %}
+                <div class="cell-dim" style="font-size:0.85em;margin-top:4px">
+                    Sous-types : {{ mt.subtypes|map(attribute='name')|join(', ') }}
+                </div>
+                {% endif %}
+            </td>
+            <td>{{ counts[mt.id] }}</td>
+            <td class="users-table-actions">
+                <a class="btn btn-ghost" href="{{ url_for(edit_ep, type_id=mt.id) }}">Modifier</a>
+                <form method="post" action="{{ url_for(delete_ep, type_id=mt.id) }}"
+                      class="inline-form"
+                      onsubmit="return confirm('Supprimer le type « {{ mt.name }} » ? {% if counts[mt.id] %}{{ counts[mt.id] }} événement(s) perdront leur type.{% endif %}');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-danger" type="submit">Supprimer</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="cell-dim" style="text-align:center;padding:24px">Aucun type. Créez-en un.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

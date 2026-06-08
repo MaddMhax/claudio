@@ -1,0 +1,13 @@
+[tool.ruff]
+# Keep the lint surface tight so CI stays meaningful (real errors) rather than
+# drowning in style noise on an existing codebase. Bump the rule set later.
+line-length = 100
+
+[tool.ruff.lint]
+# E9 = syntax errors, F = pyflakes (undefined names, unused imports).
+# Kept deliberately narrow; the lint CI job is non-blocking for now anyway.
+select = ["E9", "F"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

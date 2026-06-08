@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Clients — Claudio{% endblock %}
+{% block content %}
+<section class="calendar-toolbar">
+    <h1 class="cal-title">Clients</h1>
+    <div class="cal-actions">
+        <a class="btn btn-primary" href="{{ url_for('clients.create_client') }}">+ Nouveau client</a>
+    </div>
+</section>
+
+<table class="users-table">
+    <thead>
+        <tr>
+            <th>Nom</th>
+            <th>Notes</th>
+            <th>Projets</th>
+            <th class="users-table-actions">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for c in clients %}
+        <tr>
+            <td><strong>{{ c.name }}</strong></td>
+            <td class="cell-dim cell-difficulties">{{ c.notes or '—' }}</td>
+            <td>{{ counts[c.id] }}</td>
+            <td class="users-table-actions">
+                <a class="btn btn-ghost" href="{{ url_for('projects.project_new', client_id=c.id) }}">+ Projet</a>
+                <a class="btn btn-ghost" href="{{ url_for('clients.edit_client', client_id=c.id) }}">Modifier</a>
+                <form method="post" action="{{ url_for('clients.delete_client', client_id=c.id) }}"
+                      class="inline-form"
+                      onsubmit="return confirm('Supprimer le client « {{ c.name }} » ? {% if counts[c.id] %}{{ counts[c.id] }} projet(s) et tout leur contenu (missions, réunions, tâches) seront également supprimés.{% endif %}');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-danger" type="submit">Supprimer</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="cell-dim" style="text-align:center;padding:24px">Aucun client enregistré. Créez-en un.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

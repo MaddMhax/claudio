@@ -1,0 +1,1611 @@
+/* ===== Claudio — chameleon-green identity =====
+   The palette is built around the chameleon logo's main scale tones
+   (#1fa878 / #168a66) with a teal-cyan secondary that matches the
+   chameleon's "feet" tiles, and the same warm accents for warnings. */
+:root,
+:root[data-theme="dark"] {
+    --bg: #0a1620;         /* deepest tropical-canopy night */
+    --bg-2: #0f2129;
+    --surface: #163039;
+    --surface-2: #1d4148;
+    --border: #265658;
+    --text: #e7f6ee;
+    --text-dim: #9dc3b3;
+    --primary: #27c98f;    /* chameleon main scale */
+    --primary-2: #1fa878;
+    --accent: #3aa5c9;     /* teal foot-tile */
+    --danger: #e07a5f;     /* terracotta foot-tile */
+    --success: #2ad494;
+    --warning: #e0a23a;    /* amber foot-tile */
+    --radius: 10px;
+    --shadow: 0 6px 22px rgba(7, 22, 18, 0.45);
+    --topbar-bg: rgba(10, 22, 32, 0.78);
+    color-scheme: dark;
+}
+
+:root[data-theme="light"] {
+    --bg: #f4faf6;
+    --bg-2: #e7f3eb;
+    --surface: #ffffff;
+    --surface-2: #dbece1;
+    --border: #b7d6c5;
+    --text: #0a2722;
+    --text-dim: #3f6358;
+    --primary: #1fa878;
+    --primary-2: #168a66;
+    --accent: #267e9c;
+    --danger: #c14a31;
+    --success: #168a66;
+    --warning: #b67619;
+    --shadow: 0 6px 22px rgba(15, 80, 60, 0.10);
+    --topbar-bg: rgba(244, 250, 246, 0.88);
+    color-scheme: light;
+}
+
+/* Re-tune the badge / status pill text colors under the light theme — the
+   default values (#fcd34d, #86efac, #fca5a5, …) are light shades meant for
+   dark backgrounds and would wash out on white. */
+:root[data-theme="light"] .status-preplanifie { color: #92400e; }
+:root[data-theme="light"] .status-planifie    { color: #15803d; }
+:root[data-theme="light"] .status-warn        { color: #b91c1c; }
+:root[data-theme="light"] .status-link        { color: #1d4ed8; }
+:root[data-theme="light"] .status-en_cours    { color: #1d4ed8; }
+:root[data-theme="light"] .status-termine     { color: #334155; }
+
+* { box-sizing: border-box; }
+html, body {
+    margin: 0;
+    padding: 0;
+    background: linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+}
+
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; }
+
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 28px;
+    background: var(--topbar-bg);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+}
+.brand {
+    display: flex; align-items: center; gap: 12px;
+    font-weight: 700; font-size: 1.1rem;
+    letter-spacing: 0.02em;
+}
+.brand-mark {
+    display: inline-block;
+    width: 34px;
+    height: 34px;
+    background-image: url("../img/claudio_logo_transparent.svg");
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 2px 6px rgba(31, 168, 120, 0.35));
+}
+.brand-text {
+    background: linear-gradient(120deg, #27c98f 0%, #2ad494 40%, #3aa5c9 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+.topbar-nav { display: flex; align-items: center; gap: 12px; }
+
+/* ===== Tasks on the planning view ===== */
+.cal-tasks {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.cal-task {
+    --status-color: #94a3b8;
+    background: color-mix(in srgb, var(--status-color) 18%, transparent);
+    border-left: 3px solid var(--status-color);
+    border-radius: 4px;
+    font-size: 0.74rem;
+    line-height: 1.25;
+}
+.cal-task a, .cal-task-readonly {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    color: var(--text);
+    text-decoration: none;
+}
+.cal-task a:hover { background: color-mix(in srgb, var(--status-color) 30%, transparent); }
+.cal-task-emoji { font-size: 0.9rem; line-height: 1; }
+.cal-task-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+/* ===== Meetings on the planning view ===== */
+.cal-meetings {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.cal-meeting {
+    --meeting-color: #a855f7;
+    background: color-mix(in srgb, var(--meeting-color) 18%, transparent);
+    border-left: 3px solid var(--meeting-color);
+    border-radius: 4px;
+    font-size: 0.74rem;
+    line-height: 1.25;
+}
+.cal-meeting a, .cal-meeting-readonly {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    color: var(--text);
+    text-decoration: none;
+}
+.cal-meeting a:hover { background: color-mix(in srgb, var(--meeting-color) 30%, transparent); }
+.cal-meeting-icon { font-size: 0.85rem; line-height: 1; }
+.cal-meeting-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+/* Specificity boost via the double class so the rules below win against
+   the generic `.cal-add` declarations further down in the stylesheet. */
+.cal-add.cal-add-task {
+    background: rgba(31, 168, 120, 0.18);
+    border: 1px solid rgba(31, 168, 120, 0.45);
+    color: var(--primary);
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+.cal-add.cal-add-task:hover {
+    background: rgba(31, 168, 120, 0.32);
+    color: var(--primary);
+}
+
+/* ===== Task status pill (admin tasks page + calendar overlay) ===== */
+.task-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--status-color) 18%, transparent);
+    border: 1px solid var(--status-color);
+    color: var(--text);
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+.task-status-pill::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--status-color);
+}
+
+.form-card-summary {
+    list-style: none;
+    cursor: pointer;
+    font-weight: 600;
+    margin-bottom: 14px;
+    user-select: none;
+}
+.form-card-summary::-webkit-details-marker { display: none; }
+.form-card-summary::before {
+    content: "▸ ";
+    display: inline-block;
+    margin-right: 4px;
+    transition: transform 0.15s ease;
+}
+details[open] > .form-card-summary::before {
+    transform: rotate(90deg);
+}
+
+.hotkey {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg-2);
+    color: var(--text-dim);
+    font-family: ui-monospace, "Menlo", monospace;
+    font-size: 0.72rem;
+    line-height: 1.2;
+    font-weight: 600;
+}
+
+/* ===== Generic topbar dropdown menu (People, …) ===== */
+.menu-wrap { position: relative; }
+.menu-wrap .caret {
+    margin-left: 4px;
+    font-size: 0.7rem;
+    opacity: 0.75;
+}
+.menu-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    z-index: 60;
+    min-width: 180px;
+    padding: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    animation: menu-pop 0.16s ease-out;
+}
+.menu-panel[hidden] { display: none; }
+@keyframes menu-pop {
+    from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+}
+.menu-panel a {
+    display: block;
+    padding: 8px 12px;
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.92rem;
+}
+.menu-panel a:hover { background: var(--bg-2); }
+
+.user-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.9rem;
+}
+.user-badge::before {
+    content: ""; width: 10px; height: 10px; border-radius: 50%;
+    background: var(--user-color, var(--primary));
+}
+
+/* ===== Topbar user menu (avatar → name/role, theme, logout) ===== */
+.user-menu-toggle { gap: 6px; }
+.user-menu-avatar {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--user-color, var(--primary));
+    font-size: 0.85rem; line-height: 1;
+}
+.user-menu-head {
+    display: flex; flex-direction: column; gap: 2px;
+    padding: 8px 12px 10px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid var(--border);
+}
+.user-menu-name {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-weight: 600; font-size: 0.95rem;
+}
+.user-menu-name::before {
+    content: ""; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--user-color, var(--primary));
+}
+.user-menu-head .user-role { font-size: 0.82rem; opacity: 0.8; }
+.user-menu-form { margin: 0; display: block; }
+/* Change-password link + theme + logout: a uniform menu-item look. The panel
+   scope (.user-menu-panel …) outranks the generic `.menu-panel a` rule so the
+   <a> item matches the <button> items. */
+.user-menu-panel .user-menu-item {
+    display: flex; align-items: center; gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border: none; border-radius: 6px;
+    background: none; color: var(--text);
+    font: inherit; font-size: 0.92rem; text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+.user-menu-panel .user-menu-item:hover { background: var(--bg-2); }
+
+.inline-form { display: inline; }
+
+.container { max-width: none; margin: 0 auto; padding: 24px 28px 64px; }
+
+/* ===== App footer (version + build name) ===== */
+.app-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 18px 28px 28px;
+    color: var(--text-dim);
+    font-size: 0.78rem;
+}
+.app-footer .footer-brand { font-weight: 600; }
+.app-footer .footer-sep { opacity: 0.5; }
+.app-footer .footer-build { font-style: italic; opacity: 0.85; cursor: help; }
+
+.btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 8px 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+.btn:hover { background: var(--surface-2); }
+.btn-primary { background: var(--primary); border-color: var(--primary); }
+.btn-primary:hover { background: var(--primary-2); border-color: var(--primary-2); }
+.btn-ghost { background: transparent; }
+.btn-danger { background: var(--danger); border-color: var(--danger); }
+.btn-danger:hover { filter: brightness(1.1); }
+.btn-block { width: 100%; }
+
+.flash-list { list-style: none; padding: 0; margin: 0 0 18px; }
+.flash {
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+}
+.flash-success { border-color: var(--success); }
+.flash-danger  { border-color: var(--danger); }
+.flash-warning { border-color: var(--warning); }
+.flash-info    { border-color: var(--primary); }
+
+.auth-card, .form-card {
+    max-width: 440px;
+    margin: 6vh auto;
+    padding: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+}
+.form-card { max-width: 640px; }
+.form-card-wide { max-width: 760px; }
+
+/* ===== Claudio login hero ===== */
+.auth-card {
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+}
+.auth-card::before {
+    content: "";
+    position: absolute;
+    inset: -40% -20% auto auto;
+    width: 360px;
+    height: 360px;
+    background: radial-gradient(closest-side, rgba(39, 201, 143, 0.22), transparent 70%);
+    pointer-events: none;
+}
+.auth-card::after {
+    content: "";
+    position: absolute;
+    inset: auto auto -50% -25%;
+    width: 320px;
+    height: 320px;
+    background: radial-gradient(closest-side, rgba(58, 165, 201, 0.18), transparent 70%);
+    pointer-events: none;
+}
+.auth-card > * { position: relative; }
+.auth-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 22px;
+}
+.auth-logo {
+    width: 132px;
+    height: 132px;
+    background-image: url("../img/claudio_logo_transparent.svg");
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    filter: drop-shadow(0 8px 24px rgba(31, 168, 120, 0.35));
+}
+.auth-wordmark {
+    font-size: 2.4rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    background: linear-gradient(120deg, #27c98f 0%, #2ad494 40%, #3aa5c9 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+.auth-tagline {
+    color: var(--text-dim);
+    font-size: 0.95rem;
+    margin: 0;
+}
+.auth-card form { text-align: left; }
+/* "ou" divider between password login and the SSO button. */
+.auth-sep {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 18px 0;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+}
+.auth-sep::before, .auth-sep::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+}
+
+/* Inline checkbox field (label beside the box, not above). */
+.field-check {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+.field-check input { width: auto; }
+
+/* Callout / info banner. */
+.callout {
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-2);
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+.callout-info { border-color: var(--accent); }
+
+/* Read-only key/value list (env-mode SSO display). */
+dl.kv {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 16px;
+    margin: 0;
+    text-align: left;
+}
+dl.kv dt { color: var(--text-dim); }
+dl.kv dd { margin: 0; word-break: break-all; }
+
+/* ===== Workflow steps ===== */
+.workflow-steps {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 18px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.workflow-steps li {
+    flex: 1 1 0;
+    min-width: 180px;
+    padding: 10px 12px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.workflow-steps .step-num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 0.8rem;
+    flex-shrink: 0;
+}
+.workflow-steps .step-current  { border-color: var(--primary); color: var(--text); }
+.workflow-steps .step-current  .step-num { background: var(--primary); border-color: var(--primary); color: white; }
+.workflow-steps .step-done     { border-color: var(--success); color: var(--text); }
+.workflow-steps .step-done     .step-num { background: var(--success); border-color: var(--success); color: white; }
+
+/* ===== Status pill ===== */
+.status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 18px;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+}
+.status-pill::before {
+    content: ""; width: 8px; height: 8px; border-radius: 50%;
+}
+.status-preplanifie { background: rgba(245, 158, 11, 0.15); border-color: #f59e0b; color: #fcd34d; }
+.status-preplanifie::before { background: #f59e0b; }
+.status-planifie    { background: rgba(34, 197, 94, 0.15);  border-color: #22c55e; color: #86efac; }
+.status-planifie::before    { background: #22c55e; }
+.status-warn        { background: rgba(239, 68, 68, 0.15);  border-color: #ef4444; color: #fca5a5; }
+.status-warn::before { display: none; }
+.status-link        { background: rgba(59, 130, 246, 0.15); border-color: #3b82f6; color: #93c5fd; text-decoration: none; }
+.status-link::before { display: none; }
+.status-link:hover  { background: rgba(59, 130, 246, 0.28); }
+.status-left { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+/* ===== FPR block ===== */
+.fpr-block {
+    border: 1px solid var(--border);
+    background: var(--bg-2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+}
+.checkbox-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+}
+.checkbox-inline input[type="checkbox"] {
+    width: 18px; height: 18px;
+    accent-color: var(--primary);
+}
+.fpr-warning {
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: rgba(239, 68, 68, 0.10);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    border-radius: 8px;
+    color: #fca5a5;
+    font-size: 0.88rem;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.fpr-warning .warn-icon { font-size: 1.1rem; }
+
+/* Generic soft (yellow / info) inline warning — non-blocking, just informative.
+   Reused by .past-date-warn for backwards compat. */
+.soft-warn, .past-date-warn {
+    margin-top: 10px;
+    padding: 9px 14px;
+    background: rgba(245, 158, 11, 0.10);
+    border: 1px solid rgba(245, 158, 11, 0.45);
+    border-radius: 8px;
+    color: #fcd34d;
+    font-size: 0.86rem;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+.soft-warn .warn-icon, .past-date-warn .warn-icon { font-size: 1rem; }
+
+/* ===== Date history (event edit) ===== */
+.date-history {
+    margin-bottom: 18px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0 16px;
+}
+.date-history summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 0;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.92rem;
+    list-style: none;
+}
+.date-history summary::-webkit-details-marker { display: none; }
+.date-history summary::before {
+    content: "▸";
+    color: var(--text-dim);
+    transition: transform 0.15s ease;
+    display: inline-block;
+}
+.date-history[open] summary::before { transform: rotate(90deg); }
+.date-history-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 22px;
+    padding: 1px 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-dim);
+}
+.date-history-list {
+    list-style: none;
+    padding: 0 0 14px;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.date-history-list li {
+    padding: 10px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.88rem;
+}
+.date-history-when {
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+}
+.date-history-what .status-pill {
+    margin: 0 4px;
+    padding: 2px 8px;
+    font-size: 0.78rem;
+}
+
+/* ===== Participants + live availability (event form) ===== */
+.participants-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 6px;
+}
+.participant-row {
+    display: grid;
+    /* check | dot | name+role (grows) | prio chip
+       availability spans the full second row when present */
+    grid-template-columns: auto auto 1fr auto;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 4px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    font-size: 0.88rem;
+    line-height: 1.4;
+    cursor: pointer;
+}
+.participant-row:hover { background: var(--bg-2); }
+.participant-row[hidden] { display: none; }
+.participants-notice {
+    padding: 10px 12px;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    margin-top: 8px;
+    font-size: 0.86rem;
+}
+.participant-row .user-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+.participant-id { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.participant-name { font-weight: 600; }
+.participant-role { font-size: 0.78rem; }
+.participant-prio {
+    font-size: 0.74rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid #f59e0b;
+    color: #fcd34d;
+    white-space: nowrap;
+}
+.participant-row.is-prio { border-color: rgba(245, 158, 11, 0.45); }
+.participant-avail {
+    grid-column: 1 / -1;
+    padding-left: 26px;       /* indent under the checkbox + dot */
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+.participant-avail:empty { display: none; }
+.participant-row.avail-free  { border-left-color: var(--success); }
+.participant-row.avail-busy  { border-left-color: var(--warning); }
+.avail-mark { font-weight: 700; margin-right: 4px; }
+.avail-free .avail-mark { color: var(--success); }
+.avail-busy .avail-mark { color: var(--warning); }
+.avail-next {
+    margin-top: 4px;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+}
+
+.cal-event-warn {
+    margin-left: 4px;
+    filter: drop-shadow(0 0 2px rgba(239, 68, 68, 0.5));
+}
+
+/* ===== Projects synthesis ===== */
+.projects-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+}
+.summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 16px;
+    text-align: center;
+}
+.summary-num {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+}
+.summary-lbl {
+    margin-top: 6px;
+    color: var(--text-dim);
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.summary-card-preplanifie { border-color: #f59e0b; }
+.summary-card-preplanifie .summary-num { color: #fcd34d; }
+.summary-card-planifie    { border-color: #22c55e; }
+.summary-card-planifie    .summary-num { color: #86efac; }
+.summary-card-en_cours    { border-color: #3b82f6; }
+.summary-card-en_cours    .summary-num { color: #93c5fd; }
+.summary-card-termine     { border-color: #64748b; }
+.summary-card-termine     .summary-num { color: #cbd5e1; }
+
+/* ===== Monthly person-days breakdown ===== */
+.monthly-pd {
+    margin-bottom: 24px;
+    padding: 20px 22px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.monthly-pd-head { margin-bottom: 12px; }
+.monthly-pd-head h2 { margin: 0; font-size: 1.1rem; }
+.monthly-pd-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.monthly-pd-table td {
+    padding: 6px 10px;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--border);
+}
+.monthly-pd-table tr:last-child td { border-bottom: none; }
+.mpd-label {
+    width: 170px;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+.mpd-bar {
+    width: 100%;
+}
+.mpd-bar span {
+    display: block;
+    height: 14px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--primary) 0%, #6366f1 100%);
+    min-width: 2px;
+    transition: width 0.3s ease;
+}
+.mpd-num {
+    width: 60px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+
+.projects-table-wrap { overflow-x: auto; }
+.projects-table { min-width: 920px; }
+
+/* ===== CSV export panel ===== */
+.export-card .export-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin-top: 12px;
+}
+.export-card .export-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    flex: 1 1 280px;
+}
+.export-card .export-form-label {
+    font-size: 0.9rem;
+    color: var(--text-dim);
+    font-weight: 500;
+}
+.export-card .export-form select {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.92rem;
+    min-width: 160px;
+}
+.export-card code {
+    background: var(--bg-2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+
+/* ===== Pentester monthly heatmap ===== */
+.heatmap-table th.heatmap-month {
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: nowrap;
+    text-align: right;
+    color: var(--text-dim);
+}
+.heatmap-cell {
+    /* The cell intensity scales with --heat (0..1) and reuses the pentester's
+       color so each row keeps its visual identity. */
+    background: color-mix(
+        in srgb,
+        var(--user-color, var(--primary)) calc(var(--heat, 0) * 55%),
+        transparent
+    );
+    transition: background 0.15s ease;
+    min-width: 72px;
+}
+.heatmap-cell:hover {
+    background: color-mix(
+        in srgb,
+        var(--user-color, var(--primary)) calc(var(--heat, 0) * 80% + 10%),
+        transparent
+    );
+}
+.heatmap-totals td {
+    background: var(--bg-2);
+    border-top: 2px solid var(--border);
+}
+.projects-table td { vertical-align: top; }
+.cell-nowrap { white-space: nowrap; }
+.cell-num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.cell-difficulties {
+    max-width: 280px;
+    white-space: pre-wrap;
+    font-size: 0.88rem;
+    color: var(--text);
+}
+.status-en_cours { background: rgba(59, 130, 246, 0.18); border-color: #3b82f6; color: #93c5fd; }
+.status-en_cours::before { background: #3b82f6; }
+.status-termine  { background: rgba(100, 116, 139, 0.22); border-color: #64748b; color: #cbd5e1; }
+.status-termine::before  { background: #64748b; }
+
+.user-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px 3px 6px;
+    margin: 2px 4px 2px 0;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.82rem;
+}
+
+.empty-state {
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text-dim);
+    background: var(--surface);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+}
+
+/* ===== "Cette semaine" synthesis ===== */
+.week-summary {
+    margin-bottom: 18px;
+    padding: 22px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+.week-summary-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+.week-summary-head h2 { margin: 0; font-size: 1.3rem; }
+.week-summary-range { color: var(--text-dim); font-size: 0.9rem; }
+.week-summary-total { color: var(--text-dim); margin: 0 0 16px; font-size: 0.92rem; }
+.week-summary-section {
+    margin: 16px 0 8px;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-dim);
+}
+.week-summary-section:first-of-type { margin-top: 0; }
+
+.week-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+}
+.week-card {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--type-color, var(--primary));
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+.week-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+.week-card-head h3 { margin: 0; font-size: 0.98rem; flex: 1; }
+.week-card-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--type-color, var(--primary));
+    flex-shrink: 0;
+}
+.week-card-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 26px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.week-event-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.week-event-list li {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    font-size: 0.86rem;
+}
+.week-event-list a { color: var(--text); }
+.week-event-list a:hover { color: var(--primary); }
+
+.cal-event-readonly {
+    cursor: default;
+}
+.auth-card h1, .form-card h1 { margin-top: 0; }
+.auth-sub { color: var(--text-dim); margin-bottom: 22px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.field label { font-size: 0.85rem; color: var(--text-dim); font-weight: 500; }
+.field input, .field textarea, .field select {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-family: inherit;
+    transition: border-color 0.15s ease;
+}
+.field input:focus, .field textarea:focus, .field select:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+.field .err { color: var(--danger); font-size: 0.8rem; }
+.field .hint { color: var(--text-dim); font-size: 0.8rem; }
+.required-mark { color: var(--danger); margin-left: 4px; font-weight: 700; }
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+
+/* ===== Calendar ===== */
+.calendar-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+.cal-nav { display: flex; align-items: center; gap: 12px; }
+.cal-title { margin: 0; font-size: 1.6rem; min-width: 220px; text-align: center; }
+.cal-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ===== View switcher (Mois / Trimestre / Année) ===== */
+.view-switch {
+    display: inline-flex;
+    padding: 3px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+}
+.view-switch-btn {
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-dim);
+    transition: background 0.15s ease, color 0.15s ease;
+    cursor: pointer;
+    user-select: none;
+}
+.view-switch-btn:hover { color: var(--text); }
+.view-switch-btn.is-active {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+
+/* ===== Technical/non-technical filter on /admin/users ===== */
+.tech-filter {
+    display: flex;
+    gap: 8px;
+    margin: 0 0 14px;
+}
+.tech-filter .btn.is-active {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+/* ===== Multi-month horizontal strip (quarter / year views) ===== */
+.multi-month-strip {
+    display: flex;
+    gap: 18px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 4px 4px 18px;
+    scroll-snap-type: x mandatory;
+    /* Subtle scrollbar styling for webkit */
+    scrollbar-color: var(--border) transparent;
+}
+.multi-month-strip::-webkit-scrollbar { height: 12px; }
+.multi-month-strip::-webkit-scrollbar-track { background: var(--bg-2); border-radius: 8px; }
+.multi-month-strip::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 8px;
+    border: 2px solid var(--bg-2);
+}
+.multi-month-strip::-webkit-scrollbar-thumb:hover { background: var(--surface-2); }
+
+.month-panel {
+    flex: 0 0 auto;
+    width: 560px;
+    scroll-snap-align: start;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 14px 16px;
+    display: flex;
+    flex-direction: column;
+}
+.month-panel-title {
+    margin: 0 0 10px;
+    font-size: 1.05rem;
+    font-weight: 600;
+    text-transform: capitalize;
+    letter-spacing: 0.01em;
+}
+.month-panel-year {
+    color: var(--text-dim);
+    font-weight: 400;
+    margin-left: 4px;
+}
+
+/* Compact grid used inside month-panel (smaller cells so 3-12 months fit) */
+.calendar-grid--compact .cal-cell { min-height: 78px; padding: 4px 4px 6px; }
+.calendar-grid--compact .cal-header { padding: 6px 4px; font-size: 0.72rem; }
+.calendar-grid--compact .cal-daynum { font-size: 0.78rem; }
+.calendar-grid--compact .cal-cell-head { margin-bottom: 3px; }
+.calendar-grid--compact .cal-events { gap: 2px; }
+.calendar-grid--compact .cal-event a,
+.calendar-grid--compact .cal-event .cal-event-readonly {
+    padding: 2px 4px;
+    font-size: 0.68rem;
+    border-radius: 4px;
+    border-left-width: 3px;
+}
+.calendar-grid--compact .cal-event-time { margin-right: 2px; }
+.calendar-grid--compact .cal-event-member { margin-right: 2px; }
+.calendar-grid--compact .cal-event-flag { padding: 0 3px; font-size: 0.58rem; margin-right: 2px; }
+
+.member-legend {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.status-legend {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+.status-legend-chip { padding: 6px 14px; }
+.legend-sample {
+    display: inline-block;
+    width: 28px;
+    height: 14px;
+    border-radius: 3px;
+    margin-right: 4px;
+    vertical-align: middle;
+}
+.sample-planifie {
+    background: rgba(59, 130, 246, 0.35);
+    border: 1.5px solid #3b82f6;
+}
+.sample-preplanifie {
+    background: rgba(245, 158, 11, 0.28);
+    border: 1.5px dashed #f59e0b;
+}
+.legend-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    font-size: 0.85rem;
+}
+.legend-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--user-color);
+}
+
+.calendar-grid {
+    display: grid;
+    /* minmax(0, 1fr), not just 1fr, so columns honor the equal-fifth share
+       even when a cell carries an unbreakable (white-space: nowrap) event
+       label that would otherwise widen the column past its share. Without
+       this, a long mission title in the compact panel pushes Friday off
+       the 560 px strip card. */
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.cal-header {
+    background: var(--surface);
+    padding: 10px;
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-dim);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.cal-cell {
+    background: var(--surface);
+    min-height: 120px;
+    padding: 6px 6px 8px;
+    display: flex;
+    flex-direction: column;
+    /* Flex children default to min-width: auto (= content intrinsic size).
+       Override so .cal-event chips with nowrap text can't widen the cell. */
+    min-width: 0;
+}
+.cal-events { min-width: 0; }
+.cal-event { min-width: 0; }
+.cal-cell-empty { background: var(--bg-2); }
+.cal-cell-today { background: var(--surface-2); box-shadow: inset 0 0 0 2px var(--primary); }
+/* Green tint when at least one auditor (web/mobile/code) is free that day. */
+.cal-cell-available {
+    background: linear-gradient(180deg,
+        rgba(34, 197, 94, 0.07) 0%,
+        rgba(34, 197, 94, 0.03) 100%);
+    box-shadow: inset 2px 0 0 rgba(34, 197, 94, 0.40);
+}
+/* Today + available: keep today's blue ring on top, blend the green inside. */
+.cal-cell-today.cal-cell-available {
+    background: linear-gradient(180deg,
+        rgba(34, 197, 94, 0.09) 0%,
+        var(--surface-2) 100%);
+    box-shadow: inset 0 0 0 2px var(--primary);
+}
+/* Red fill when a collaborator is double-booked that day (overcharged).
+   The whole cell goes red so it's obvious at a glance, but the tint stays
+   translucent enough that the cell's content (missions, names) stays readable.
+   Non-blocking — purely a heads-up. Wins over the green "available" tint. */
+.cal-cell-overcharged,
+.cal-cell-available.cal-cell-overcharged {
+    background: rgba(239, 68, 68, 0.22);
+    box-shadow: inset 3px 0 0 rgba(239, 68, 68, 0.85);
+}
+/* Today + overcharged: keep today's blue ring on top of the red fill. */
+.cal-cell-today.cal-cell-overcharged {
+    background: rgba(239, 68, 68, 0.22);
+    box-shadow: inset 0 0 0 2px var(--primary);
+}
+/* French public holidays (chômé / non-worked) — the cell looks exactly like a
+   plain "no pentester available" day: fully transparent, no tint and no green
+   "available" bar / red "overcharged" fill, whatever else is flagged. The red
+   holiday label alone marks it. (A holiday toggled "travaillé" is no longer a
+   holiday and colours normally.) */
+.cal-cell-holiday,
+.cal-cell-holiday.cal-cell-available,
+.cal-cell-holiday.cal-cell-overcharged {
+    background: var(--surface);   /* identical to a plain, no-availability cell */
+    box-shadow: none;             /* kill the green "available" left-bar */
+}
+.cal-cell-holiday .cal-daynum { color: var(--text-dim); font-style: italic; }
+/* Keep today's ring even on a holiday (defined after, wins on equal specificity). */
+.cal-cell-holiday.cal-cell-today { box-shadow: inset 0 0 0 2px var(--primary); }
+.cal-holiday-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #ef4444;
+    font-style: italic;
+    line-height: 1.2;
+    margin-bottom: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.calendar-grid--compact .cal-holiday-label { font-size: 0.74rem; margin-bottom: 2px; }
+.cal-cell-head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+.cal-daynum { font-weight: 600; font-size: 0.9rem; margin-right: auto; }
+.cal-add {
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+    font-size: 1rem;
+    line-height: 1;
+    color: var(--text-dim);
+    opacity: 0;
+    transition: opacity 0.15s ease, background 0.15s ease;
+}
+.cal-cell:hover .cal-add { opacity: 1; }
+.cal-add:hover { background: var(--bg-2); color: var(--text); }
+
+.cal-events { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 3px; }
+
+/* ===== Default = Planifié (confirmé, solide) ===== */
+.cal-event a, .cal-event .cal-event-readonly {
+    display: block;
+    padding: 4px 6px;
+    border-radius: 6px;
+    background: color-mix(in srgb, var(--user-color) 30%, transparent);
+    border: 1px solid color-mix(in srgb, var(--user-color) 45%, transparent);
+    border-left: 4px solid var(--type-color, var(--user-color));
+    font-size: 0.78rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.cal-event a:hover {
+    background: color-mix(in srgb, var(--user-color) 45%, transparent);
+}
+
+/* ===== Préplanifié (provisoire) ===== */
+/* Flat amber tint + dashed border mark it as provisional. The "PRÉ" badge
+   carries the status; the old diagonal hatching hurt label legibility. */
+.cal-event--preplanifie a, .cal-event--preplanifie .cal-event-readonly {
+    background: rgba(245, 158, 11, 0.18);
+    border: 1.5px dashed rgba(245, 158, 11, 0.75);
+    border-left: 4px dashed var(--type-color, var(--user-color));
+    opacity: 1;
+}
+.cal-event--preplanifie a:hover {
+    background: rgba(245, 158, 11, 0.30);
+}
+
+/* "PRÉ" badge */
+.cal-event-flag {
+    display: inline-block;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    margin-right: 4px;
+    vertical-align: middle;
+    line-height: 1.3;
+}
+.flag-pre { background: #f59e0b; color: #1a1a1a; }
+.cal-event-time {
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-right: 4px;
+    font-variant-numeric: tabular-nums;
+}
+.cal-event-member {
+    font-weight: 600;
+    color: var(--user-color);
+    margin-right: 4px;
+}
+.cal-event-title { color: var(--text); }
+
+.user-role, .legend-role {
+    color: var(--text-dim);
+    font-size: 0.78rem;
+    margin-left: 4px;
+    font-weight: 400;
+}
+
+/* ===== Error page ===== */
+.error-card {
+    max-width: 520px;
+    margin: 8vh auto;
+    padding: 40px 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+.error-code {
+    font-size: 4rem;
+    font-weight: 800;
+    color: var(--primary);
+    line-height: 1;
+    margin-bottom: 12px;
+    font-variant-numeric: tabular-nums;
+}
+.error-card h1 { margin: 0 0 10px; }
+.error-msg { color: var(--text-dim); margin-bottom: 24px; }
+
+/* ===== Users management ===== */
+.users-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+.users-table th, .users-table td {
+    padding: 12px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.92rem;
+}
+.users-table th {
+    background: var(--bg-2);
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+.users-table tr:last-child td { border-bottom: none; }
+/* Keep the actions cell a real table-cell — using display:flex here "de-tables"
+   it, so it stops sharing the row's height/baseline and the column ends up taller
+   than the rest of the row. Lay the buttons out inline (they're inline-flex) and
+   space them with a margin between siblings instead of a flex gap. */
+.users-table-actions { text-align: right; white-space: nowrap; vertical-align: middle; }
+.users-table-actions > * + * { margin-left: 8px; }
+/* Give the holidays status pills a uniform footprint so « Chômé » and
+   « Travaillé (exception) » line up. */
+.holidays-table td { vertical-align: middle; }
+.holidays-table .status-pill {
+    min-width: 180px;
+    justify-content: center;
+}
+.users-table code {
+    background: var(--bg-2);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+.user-dot {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--user-color);
+    border: 2px solid var(--bg-2);
+}
+.role-tag {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    background: var(--bg-2);
+}
+.role-tag + .role-tag { margin-left: 4px; }
+.cell-dim { color: var(--text-dim); }
+
+/* Audit log: filter bar + pager. */
+.audit-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.audit-filters .field { margin: 0; }
+.audit-filter-actions { display: flex; gap: 8px; align-items: flex-end; }
+.audit-pager {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 16px;
+}
+
+/* One-time API-token reveal + curl example: monospace block, easy to select. */
+.token-reveal {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin: 6px 0 0;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 0.9rem;
+    user-select: all;
+}
+.token-reveal code { color: var(--text); background: none; }
+
+/* Visually-hidden but screen-reader-available (accessible labels). */
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ===== SSO / OIDC admin ===== */
+.sso-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.sso-head h1 { margin: 0; }
+.sso-src {
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    background: color-mix(in srgb, currentColor 16%, transparent);
+}
+/* Callback URL + copy button on one line. */
+.copy-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 4px 0 8px;
+}
+.btn-copy { padding: 4px 10px; font-size: 0.8rem; }
+
+/* Inline field warnings (validation hints). */
+.warn-inline { color: var(--warning); font-size: 0.8rem; }
+
+/* Test-connection trigger + result panel. */
+.sso-test-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+.sso-test-result {
+    margin-top: 10px;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-2);
+    font-size: 0.85rem;
+}
+.sso-test-result.is-ok { border-color: var(--success); }
+.sso-test-result.is-err { border-color: var(--danger); }
+.sso-test-kv {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 4px 12px;
+    margin-top: 6px;
+}
+.sso-test-kv span { color: var(--text-dim); }
+.sso-test-kv code { word-break: break-all; }
+
+/* SSO login button with provider logo. */
+.btn-sso {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+.sso-logo {
+    display: inline-flex;
+    align-items: center;
+}
+.sso-logo svg { display: block; }
+
+@media (max-width: 900px) {
+    .cal-cell { min-height: 80px; font-size: 0.85rem; }
+    .cal-title { min-width: auto; font-size: 1.2rem; }
+    .field-row { grid-template-columns: 1fr; }
+    .users-table { font-size: 0.85rem; }
+}

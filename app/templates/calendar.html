@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block title %}{{ view_title }} — Claudio{% endblock %}
+
+{% macro render_panel(panel, compact=False) %}
+<div class="calendar-grid {% if compact %}calendar-grid--compact{% endif %}" aria-label="{{ panel.month_name }} {{ panel.year }}">
+    {% for label in ['Lun','Mar','Mer','Jeu','Ven'] %}
+        <div class="cal-header">{{ label }}</div>
+    {% endfor %}
+
+    {% for week in panel.weeks %}
+        {% for day in week %}
+            {% if day == 0 %}
+                <div class="cal-cell cal-cell-empty"></div>
+            {% else %}
+                {% set is_today = (day == today.day and panel.month == today.month and panel.year == today.year) %}
+                {% set holiday_name = panel.holidays_by_day.get(day) %}
+                {% set is_holiday = holiday_name is not none %}
+                {% set is_available = day in panel.days_available %}
+                {% set is_overcharged = day in panel.days_overcharged %}
+                <div class="cal-cell
+                            {% if is_today %}cal-cell-today{% endif %}
+                            {% if is_holiday %}cal-cell-holiday{% endif %}
+                            {% if is_available and not is_holiday %}cal-cell-available{% endif %}
+                            {% if is_overcharged and not is_holiday %}cal-cell-overcharged{% endif %}"
+                    {% if is_holiday %}title="Jour férié — {{ holiday_name }}"
+                    {% elif is_overcharged %}title="Jour surchargé — un collaborateur a au moins deux missions ce jour-là"
+                    {% elif is_available %}title="Au moins un auditeur disponible"{% endif %}>
+                    <div class="cal-cell-head">
+                        <span class="cal-daynum">{{ day }}</span>
+                        {% if current_user.is_admin and not is_holiday %}
+                        <a class="cal-add cal-add-task" title="Ajouter une tâche"
+                           href="{{ url_for('tasks.list_tasks') }}?date={{ '%04d-%02d-%02d'|format(panel.year, panel.month, day) }}">T+</a>
+                        {% endif %}
+                        {% if current_user.can_manage_events and not is_holiday %}
+                        <a class="cal-add" title="Ajouter un événement"
+                           href="{{ url_for('planning.event_new') }}?date={{ '%04d-%02d-%02d'|format(panel.year, panel.month, day) }}">+</a>
+                        {% endif %}
+                    </div>
+                    {% if is_holiday %}
+                    <div class="cal-holiday-label">🇫🇷 {{ holiday_name }}</div>
+                    {% endif %}
+                    {% set day_tasks = panel.tasks_by_day.get(day, []) %}
+                    {% if day_tasks %}
+                    <ul class="cal-tasks">
+                        {% for t in day_tasks %}
+                        {% set status_color = t.status.color if t.status else '#94a3b8' %}
+                        {% set tooltip = t.name %}
+                        {% if t.status %}{% set tooltip = tooltip ~ ' · ' ~ t.status.name %}{% endif %}
+                        {% if t.description %}{% set tooltip = tooltip ~ ' — ' ~ t.description %}{% endif %}
+                        <li class="cal-task" style="--status-color: {{ status_color }}">
+                            {% if current_user.is_admin %}
+                            <a href="{{ url_for('tasks.edit_task', task_id=t.id) }}" title="{{ tooltip }}">
+                            {% else %}
+                            <span class="cal-task-readonly" title="{{ tooltip }}">
+                            {% endif %}
+                                {% if t.status and t.status.emoji %}<span class="cal-task-emoji">{{ t.status.emoji }}</span>{% endif %}
+                                <span class="cal-task-title">{{ t.name }}</span>
+                            {% if current_user.is_admin %}</a>{% else %}</span>{% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    {% set day_meetings = panel.meetings_by_day.get(day, []) %}
+                    {% if day_meetings %}
+                    <ul class="cal-meetings">
+                        {% for m in day_meetings %}
+                        {% set m_color = m.category.color if m.category else '#a855f7' %}
+                        {% set m_tooltip = 'Réunion · ' ~ m.name %}
+                        {% if m.category %}{% set m_tooltip = m_tooltip ~ ' · ' ~ m.category.name %}{% endif %}
+                        <li class="cal-meeting" style="--meeting-color: {{ m_color }}">
+                            {% if current_user.can_manage_events %}
+                            <a href="{{ url_for('meetings.edit_meeting', meeting_id=m.id) }}" title="{{ m_tooltip }}">
+                            {% else %}
+                            <span class="cal-meeting-readonly" title="{{ m_tooltip }}">
+                            {% endif %}
+                                <span class="cal-meeting-icon" aria-hidden="true">👥</span>
+                                <span class="cal-meeting-title">{% if m.start_time and m.end_time %}<strong>{{ m.start_time.strftime('%H:%M') }}–{{ m.end_time.strftime('%H:%M') }}</strong> {% endif %}{{ m.name }}</span>
+                            {% if current_user.can_manage_events %}</a>{% else %}</span>{% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                    <ul class="cal-events">
+                        {% for member in members %}
+                            {% set evs = panel.by_member[member.id].get(day, []) %}
+                            {% for ev in evs %}
+                                <li class="cal-event {% if ev.status == 'preplanifie' %}cal-event--preplanifie{% endif %}"
+                                    style="--user-color: {{ member.color }};
+                                           --type-color: {{ ev.meeting_type.color if ev.meeting_type else member.color }}">
+                                    {# Technical missions span full days — their 09:00–17:00 is noise.
+                                       Show times only for meeting-type (non-technical) events. #}
+                                    {% set is_mission = ev.meeting_type and ev.meeting_type.is_technical %}
+                                    {% if is_mission %}
+                                        {% set tooltip = ev.title %}
+                                    {% else %}
+                                        {% set tooltip = ev.start_time.strftime('%H:%M') ~ '–' ~ ev.end_time.strftime('%H:%M') ~ ' · ' ~ ev.title %}
+                                    {% endif %}
+                                    {% if ev.meeting_type %}{% set tooltip = tooltip ~ ' · ' ~ ev.meeting_type.name %}{% endif %}
+                                    {% set tooltip = tooltip ~ ' · ' ~ ('Préplanifié' if ev.status == 'preplanifie' else 'Planifié') %}
+                                    {% if ev.fpr_missing %}{% set tooltip = tooltip ~ ' · FPR non reçue' %}{% endif %}
+                                    {% set tooltip = tooltip ~ ' · Créé par ' ~ (ev.created_by.full_name if ev.created_by else 'utilisateur supprimé') ~ ' le ' ~ (ev.created_at | localdt) %}
+                                    {% if ev.updated_at %}{% set tooltip = tooltip ~ ' · Modifié par ' ~ (ev.updated_by.full_name if ev.updated_by else 'utilisateur supprimé') ~ ' le ' ~ (ev.updated_at | localdt) %}{% endif %}
+                                    {% if current_user.can_manage_events %}
+                                    <a href="{{ url_for('planning.event_edit', event_id=ev.id) }}" title="{{ tooltip }}">
+                                    {% else %}
+                                    <span class="cal-event-readonly" title="{{ tooltip }}">
+                                    {% endif %}
+                                        {% if ev.status == 'preplanifie' %}<span class="cal-event-flag flag-pre">PRÉ</span>{% endif %}
+                                        {% if not is_mission %}<span class="cal-event-time">{{ ev.start_time.strftime('%H:%M') }}</span>{% endif %}
+                                        <span class="cal-event-member">{{ member.full_name.split(' ')[0] }}</span>
+                                        <span class="cal-event-title">{{ ev.title }}</span>
+                                        {% if ev.fpr_missing %}<span class="cal-event-warn" title="FPR non reçue">⚠️</span>{% endif %}
+                                    {% if current_user.can_manage_events %}</a>{% else %}</span>{% endif %}
+                                </li>
+                            {% endfor %}
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+        {% endfor %}
+    {% endfor %}
+</div>
+{% endmacro %}
+
+{% block content %}
+<section class="calendar-toolbar">
+    <div class="cal-nav">
+        <a class="btn btn-ghost" href="{{ url_for('planning.calendar', year=prev_year, month=prev_month, view=(view if view != 'month' else none)) }}">← {{ prev_label }}</a>
+        <h1 class="cal-title">{{ view_title }}</h1>
+        <a class="btn btn-ghost" href="{{ url_for('planning.calendar', year=next_year, month=next_month, view=(view if view != 'month' else none)) }}">{{ next_label }} →</a>
+    </div>
+    <div class="cal-actions">
+        <div class="view-switch" role="tablist" aria-label="Mode d'affichage">
+            <a class="view-switch-btn {% if view == 'month' %}is-active{% endif %}"
+               href="{{ url_for('planning.calendar', year=year, month=month, view='month') }}"
+               role="tab" aria-selected="{{ 'true' if view == 'month' else 'false' }}">Mois</a>
+            <a class="view-switch-btn {% if view == 'quarter' %}is-active{% endif %}"
+               href="{{ url_for('planning.calendar', year=year, month=month, view='quarter') }}"
+               role="tab" aria-selected="{{ 'true' if view == 'quarter' else 'false' }}">Trimestre</a>
+            <a class="view-switch-btn {% if view == 'year' %}is-active{% endif %}"
+               href="{{ url_for('planning.calendar', year=year, month=month, view='year') }}"
+               role="tab" aria-selected="{{ 'true' if view == 'year' else 'false' }}">Année</a>
+        </div>
+        <a class="btn btn-ghost" href="{{ url_for('planning.calendar', year=today.year, month=today.month, view=(view if view != 'month' else none)) }}">Aujourd'hui</a>
+        {% if current_user.can_manage_events %}
+            <a class="btn btn-primary" href="{{ url_for('planning.event_new') }}">+ Nouvelle mission</a>
+            <a class="btn btn-ghost" href="{{ url_for('planning.event_new', kind='absence') }}">+ Congé / Formation</a>
+        {% endif %}
+    </div>
+</section>
+
+<section class="week-summary">
+    <div class="week-summary-head">
+        <h2>Cette semaine</h2>
+        <span class="week-summary-range">du {{ week_summary.start.strftime('%d/%m') }} au {{ week_summary.end.strftime('%d/%m/%Y') }}</span>
+    </div>
+
+    {% set has_anything = week_summary.total or week_summary.tasks_total or week_summary.meetings_total %}
+
+    {% if has_anything %}
+    <p class="week-summary-total">
+        {% if week_summary.total %}<strong>{{ week_summary.total }}</strong> événement{{ 's' if week_summary.total > 1 else '' }}{% endif %}
+        {% if week_summary.meetings_total %}{% if week_summary.total %} · {% endif %}<strong>{{ week_summary.meetings_total }}</strong> réunion{{ 's' if week_summary.meetings_total > 1 else '' }}{% endif %}
+        {% if week_summary.tasks_total %}{% if week_summary.total or week_summary.meetings_total %} · {% endif %}<strong>{{ week_summary.tasks_total }}</strong> tâche{{ 's' if week_summary.tasks_total > 1 else '' }}{% endif %}.
+    </p>
+
+    {% if week_summary.total %}
+    <h3 class="week-summary-section">Événements</h3>
+    <div class="week-grid">
+        {% for type_name, bucket in week_summary.by_type.items() %}
+        <div class="week-card" style="--type-color: {{ bucket.color }}">
+            <div class="week-card-head">
+                <span class="week-card-dot"></span>
+                <h3>{{ type_name }}</h3>
+                <span class="week-card-count">{{ bucket.events|length }}</span>
+            </div>
+            <ul class="week-event-list">
+                {% for ev in bucket.events %}
+                <li>
+                    {% set creator = 'Créé par ' ~ (ev.created_by.full_name if ev.created_by else 'utilisateur supprimé') ~ ' le ' ~ (ev.created_at | localdt) %}
+                    {% if current_user.can_manage_events %}
+                    <a href="{{ url_for('planning.event_edit', event_id=ev.id) }}" title="{{ creator }}">{{ ev.title }}</a>
+                    {% else %}
+                    <span title="{{ creator }}">{{ ev.title }}</span>
+                    {% endif %}
+                    <small class="cell-dim">
+                        {% if ev.start_date == ev.end_date %}
+                            {{ ev.start_date.strftime('%d/%m') }} · {{ ev.start_time.strftime('%H:%M') }}–{{ ev.end_time.strftime('%H:%M') }}
+                        {% else %}
+                            {{ ev.start_date.strftime('%d/%m') }} → {{ ev.end_date.strftime('%d/%m') }}
+                        {% endif %}
+                    </small>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if week_summary.meetings_total %}
+    <h3 class="week-summary-section">Réunions</h3>
+    <div class="week-grid">
+        {% for cat_name, bucket in week_summary.meetings_by_category.items() %}
+        <div class="week-card" style="--type-color: {{ bucket.color }}">
+            <div class="week-card-head">
+                <span class="week-card-dot"></span>
+                <h3>{{ cat_name }}</h3>
+                <span class="week-card-count">{{ bucket.meetings|length }}</span>
+            </div>
+            <ul class="week-event-list">
+                {% for mt in bucket.meetings %}
+                <li>
+                    {% if current_user.can_manage_events %}
+                    <a href="{{ url_for('meetings.list_meetings') }}">{{ mt.name }}</a>
+                    {% else %}
+                    <span>{{ mt.name }}</span>
+                    {% endif %}
+                    <small class="cell-dim">{{ mt.date.strftime('%d/%m') }}</small>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if week_summary.tasks_total %}
+    <h3 class="week-summary-section">Tâches</h3>
+    <div class="week-grid">
+        {% for status_name, bucket in week_summary.tasks_by_status.items() %}
+        <div class="week-card" style="--type-color: {{ bucket.color }}">
+            <div class="week-card-head">
+                <span class="week-card-dot"></span>
+                <h3>{% if bucket.emoji %}{{ bucket.emoji }} {% endif %}{{ status_name }}</h3>
+                <span class="week-card-count">{{ bucket.tasks|length }}</span>
+            </div>
+            <ul class="week-event-list">
+                {% for t in bucket.tasks %}
+                <li>
+                    {% if current_user.is_admin %}
+                    <a href="{{ url_for('tasks.edit_task', task_id=t.id) }}">{{ t.name }}</a>
+                    {% else %}
+                    <span>{{ t.name }}</span>
+                    {% endif %}
+                    <small class="cell-dim">{{ t.due_date.strftime('%d/%m') }}</small>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% else %}
+    <p class="empty-state" style="padding:24px">Aucun événement, réunion ou tâche cette semaine.</p>
+    {% endif %}
+</section>
+
+{% if view == 'month' %}
+    {{ render_panel(panels[0], compact=False) }}
+{% else %}
+<div class="multi-month-strip" aria-label="{{ view_title }}" data-anchor-month="{{ '%04d-%02d'|format(year, month) }}">
+    {% for panel in panels %}
+    <article class="month-panel" data-month="{{ '%04d-%02d'|format(panel.year, panel.month) }}">
+        <h2 class="month-panel-title">{{ panel.month_name }} <span class="month-panel-year">{{ panel.year }}</span></h2>
+        {{ render_panel(panel, compact=True) }}
+    </article>
+    {% endfor %}
+</div>
+<script nonce="{{ csp_nonce }}">
+    // Scroll the year/quarter strip to the anchor month so it lands in view
+    // without the user having to scroll right manually.
+    (function () {
+        var strip = document.querySelector('.multi-month-strip');
+        if (!strip) return;
+        var anchor = strip.dataset.anchorMonth;
+        var target = strip.querySelector('.month-panel[data-month="' + anchor + '"]');
+        if (!target) return;
+        // Use scrollLeft (not scrollIntoView) so we don't drag the whole page
+        // when the strip itself is below the fold.
+        strip.scrollLeft = target.offsetLeft - strip.offsetLeft;
+    })();
+</script>
+{% endif %}
+{% endblock %}

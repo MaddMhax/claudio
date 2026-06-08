@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Modifier le projet' if mode == 'edit' else 'Nouveau projet' }} — Claudio{% endblock %}
+{% block content %}
+<section class="form-card form-card-wide">
+    <h1>{{ 'Modifier le projet' if mode == 'edit' else 'Nouveau projet' }}</h1>
+
+    <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+
+        <div class="field">
+            {{ form.name.label }}
+            {{ form.name(autofocus=true, placeholder="Audit T1 2026 — Plateforme X") }}
+            {% for e in form.name.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                {{ form.client_id.label }}
+                {{ form.client_id() }}
+                <small class="hint">Un projet appartient à un seul client.
+                    <a href="{{ url_for('clients.list_clients') }}" target="_blank" rel="noopener">Gérer les clients ↗</a>
+                </small>
+                {% for e in form.client_id.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ form.status.label }}
+                {{ form.status() }}
+            </div>
+        </div>
+
+        <div class="field">
+            {{ form.code.label }}
+            {{ form.code(placeholder="REF-2026-042") }}
+            <small class="hint">Facultatif. Référence interne / numéro de devis.</small>
+            {% for e in form.code.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            {{ form.description.label }}
+            {{ form.description(rows=4) }}
+        </div>
+
+        <div class="form-actions">
+            <a class="btn btn-ghost" href="{{ url_for('projects.projects_list') }}">Annuler</a>
+            {% if mode == 'edit' %}
+                <button form="delete-form" class="btn btn-danger" type="submit"
+                        onclick="return confirm('Supprimer ce projet ? Toutes les missions, réunions et tâches associées seront supprimées.');">Supprimer</button>
+            {% endif %}
+            <button class="btn btn-primary" type="submit">{{ 'Enregistrer' if mode == 'edit' else 'Créer le projet' }}</button>
+        </div>
+    </form>
+
+    {% if mode == 'edit' %}
+    <form id="delete-form" method="post"
+          action="{{ url_for('projects.project_delete', project_id=project.id) }}"
+          style="display:none">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+    {% endif %}
+</section>
+{% endblock %}

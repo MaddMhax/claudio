@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Mon calendrier iCal — Claudio{% endblock %}
+{% block content %}
+<section class="form-card">
+    <h1>S'abonner à mon planning (iCal)</h1>
+    <p class="hint">
+        Ajoutez cette URL comme calendrier « par abonnement » dans Outlook, Google
+        Agenda, Apple Calendrier, Thunderbird… Vos missions y apparaîtront et se
+        mettront à jour automatiquement.
+    </p>
+
+    <div class="field">
+        <label for="ical-url">URL de votre calendrier</label>
+        <span class="copy-row">
+            <code id="ical-url">{{ feed_url }}</code>
+            <button type="button" class="btn btn-ghost btn-copy" id="copy-ical"
+                    data-copy-target="ical-url" title="Copier l'URL">⧉ Copier</button>
+        </span>
+    </div>
+
+    <div class="callout callout-info">
+        ⚠ Cette URL est <strong>secrète</strong> : quiconque la possède peut voir votre
+        planning. Ne la partagez pas. En cas de fuite, régénérez-la ci-dessous
+        (l'ancien lien cessera immédiatement de fonctionner).
+    </div>
+
+    <form method="post" action="{{ url_for('calendar_feed.rotate') }}"
+          data-confirm="Régénérer le lien iCal ? L'ancien lien cessera de fonctionner et vous devrez réabonner vos applications.">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="form-actions">
+            <a class="btn btn-ghost" href="{{ url_for('planning.calendar_default') }}">Retour</a>
+            <button class="btn btn-danger" type="submit">Régénérer le lien</button>
+        </div>
+    </form>
+</section>
+
+<script nonce="{{ csp_nonce }}">
+(function () {
+    var btn = document.getElementById('copy-ical');
+    if (!btn) return;
+    btn.addEventListener('click', function () {
+        var el = document.getElementById(btn.dataset.copyTarget);
+        if (!el) return;
+        var done = function () {
+            var old = btn.textContent;
+            btn.textContent = '✓ Copié';
+            setTimeout(function () { btn.textContent = old; }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(el.textContent.trim()).then(done, done);
+        } else { done(); }
+    });
+})();
+</script>
+{% endblock %}

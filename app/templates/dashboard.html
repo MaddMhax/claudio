@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Ma semaine — Claudio{% endblock %}
+{% block content %}
+
+<section class="calendar-toolbar">
+    <h1 class="cal-title">Ma semaine</h1>
+    <div class="cal-actions">
+        <a class="btn btn-ghost" href="{{ url_for('planning.calendar_default') }}">Planning global</a>
+    </div>
+</section>
+
+<p class="cell-dim" style="margin-top:0">
+    Bonjour <strong>{{ current_user.full_name }}</strong> · semaine du
+    {{ week_start.strftime('%d/%m/%Y') }} au {{ week_end.strftime('%d/%m/%Y') }}.
+    Aperçu de ce qui vous concerne aujourd'hui et dans les {{ horizon_days }} prochains jours.
+</p>
+
+{% if pending_fpr %}
+<section class="form-card form-card-wide" style="border-left:3px solid var(--warning);margin-bottom:14px">
+    <h2 style="margin-top:0">⚠ FPR en attente ({{ pending_fpr|length }})</h2>
+    <p class="cell-dim" style="margin-top:0">Missions sur lesquelles vous êtes assigné·e mais dont la FPR n'a pas encore été reçue — la mission ne peut pas être planifiée tant que ce n'est pas le cas.</p>
+    <table class="users-table">
+        <thead>
+            <tr><th>Mission</th><th>Projet</th><th>Période</th><th></th></tr>
+        </thead>
+        <tbody>
+            {% for ev in pending_fpr %}
+            <tr>
+                <td><strong>{{ ev.title }}</strong>{% if ev.role %} <span class="cell-dim">· {{ ev.role.label }}</span>{% endif %}</td>
+                <td>{% if ev.project %}{{ ev.project.client.name }} — {{ ev.project.name }}{% else %}<span class="cell-dim">— hors projet —</span>{% endif %}</td>
+                <td>{{ ev.start_date.strftime('%d/%m/%Y') }}{% if ev.end_date != ev.start_date %} → {{ ev.end_date.strftime('%d/%m/%Y') }}{% endif %}</td>
+                <td class="users-table-actions">
+                    {% if current_user.can_manage_events %}
+                    <a class="btn btn-ghost" href="{{ url_for('planning.event_edit', event_id=ev.id) }}">Ouvrir</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+<section class="form-card form-card-wide" style="margin-bottom:14px">
+    <h2 style="margin-top:0">Cette semaine ({{ this_week|length }})</h2>
+    {% if this_week %}
+    <table class="users-table">
+        <thead>
+            <tr><th>Mission / Événement</th><th>Projet</th><th>Période</th><th>Statut</th></tr>
+        </thead>
+        <tbody>
+            {% for ev in this_week %}
+            <tr>
+                <td><strong>{{ ev.title }}</strong>{% if ev.role %} <span class="cell-dim">· {{ ev.role.label }}</span>{% endif %}</td>
+                <td>{% if ev.project %}{{ ev.project.client.name }} — {{ ev.project.name }}{% else %}<span class="cell-dim">— hors projet —</span>{% endif %}</td>
+                <td>{{ ev.start_date.strftime('%d/%m/%Y') }}{% if ev.end_date != ev.start_date %} → {{ ev.end_date.strftime('%d/%m/%Y') }}{% endif %}</td>
+                <td>
+                    <span class="status-pill status-{{ ev.status }}">
+                        {{ 'Préplanifié' if ev.status == 'preplanifie' else 'Planifié' }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state" style="padding:18px;margin:0">Rien de planifié cette semaine pour vous.</p>
+    {% endif %}
+</section>
+
+<section class="form-card form-card-wide" style="margin-bottom:14px">
+    <h2 style="margin-top:0">À venir — {{ horizon_days }} prochains jours ({{ upcoming|length }})</h2>
+    {% if upcoming %}
+    <table class="users-table">
+        <thead>
+            <tr><th>Mission / Événement</th><th>Projet</th><th>Début</th><th>Statut</th></tr>
+        </thead>
+        <tbody>
+            {% for ev in upcoming %}
+            <tr>
+                <td><strong>{{ ev.title }}</strong>{% if ev.role %} <span class="cell-dim">· {{ ev.role.label }}</span>{% endif %}</td>
+                <td>{% if ev.project %}{{ ev.project.client.name }} — {{ ev.project.name }}{% else %}<span class="cell-dim">— hors projet —</span>{% endif %}</td>
+                <td>{{ ev.start_date.strftime('%d/%m/%Y') }}</td>
+                <td>
+                    <span class="status-pill status-{{ ev.status }}">
+                        {{ 'Préplanifié' if ev.status == 'preplanifie' else 'Planifié' }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state" style="padding:18px;margin:0">Aucune mission planifiée au-delà de cette semaine.</p>
+    {% endif %}
+</section>
+
+<section class="form-card form-card-wide">
+    <h2 style="margin-top:0">Tâches à échéance ({{ tasks|length }})</h2>
+    <p class="cell-dim" style="margin-top:0">
+        Tâches sur les projets où vous êtes intervenu·e, ou sans projet, dont l'échéance
+        tombe d'ici {{ horizon_days }} jours (en retard inclus).
+    </p>
+    {% if tasks %}
+    <table class="users-table">
+        <thead>
+            <tr><th>Tâche</th><th>Projet</th><th>Statut</th><th>Échéance</th></tr>
+        </thead>
+        <tbody>
+            {% for t in tasks %}
+            <tr>
+                <td><strong>{{ t.name }}</strong></td>
+                <td>{% if t.project %}{{ t.project.name }}{% else %}<span class="cell-dim">— sans projet —</span>{% endif %}</td>
+                <td>{% if t.status %}{{ t.status.name }}{% else %}<span class="cell-dim">—</span>{% endif %}</td>
+                <td {% if t.due_date < today %}style="color:var(--danger);font-weight:600"{% endif %}>
+                    {{ t.due_date.strftime('%d/%m/%Y') }}
+                    {% if t.due_date < today %} (en retard){% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state" style="padding:18px;margin:0">Aucune tâche à échéance dans le périmètre.</p>
+    {% endif %}
+</section>
+
+{% endblock %}

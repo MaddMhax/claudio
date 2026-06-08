@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Modifier la tâche — Claudio{% endblock %}
+{% block content %}
+<section class="form-card">
+    <h1>Modifier la tâche</h1>
+
+    <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+
+        <div class="field">
+            {{ form.name.label }}
+            {{ form.name(autofocus=true) }}
+            {% for e in form.name.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            {{ form.description.label }}
+            {{ form.description(rows=4) }}
+            {% for e in form.description.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                {{ form.due_date.label }}
+                {{ form.due_date(type="date") }}
+                {% for e in form.due_date.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ form.status_id.label }}
+                {{ form.status_id() }}
+            </div>
+        </div>
+
+        <div class="field">
+            {{ form.project_id.label }}
+            {{ form.project_id() }}
+            <small class="hint">Obligatoire — sauf pour un modèle de tâche.</small>
+            {% for e in form.project_id.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            <label class="checkbox-inline">
+                {{ form.is_template(id="task-is-template") }}
+                <span>{{ form.is_template.label.text }}</span>
+            </label>
+            <small class="hint">Une tâche modèle n'apparaît pas elle-même sur le planning : à chaque création de réunion, une copie est générée avec le statut « À faire » et la date « réunion + 5 jours ». Les modèles n'appartiennent à aucun projet.</small>
+        </div>
+
+        <div class="field" id="task-auto-mission-field">
+            <label class="checkbox-inline">
+                {{ form.auto_after_mission(id="task-auto-after-mission") }}
+                <span>{{ form.auto_after_mission.label.text }}</span>
+            </label>
+            <small class="hint">Si coché, une copie de ce modèle sera automatiquement créée sur le projet à chaque création de mission technique. La date d'échéance sera <em>fin de mission + N jours ouvrés</em>.</small>
+        </div>
+
+        <div class="field" id="task-auto-offset-field">
+            {{ form.auto_offset_days.label }}
+            {{ form.auto_offset_days(type="number", min=0, max=365) }}
+            {% for e in form.auto_offset_days.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn-danger" type="submit" style="margin-right:auto"
+                    formaction="{{ url_for('tasks.delete_task', task_id=task.id) }}"
+                    formnovalidate
+                    onclick="return confirm('Supprimer la tâche « {{ task.name }} » ?');">
+                Supprimer
+            </button>
+            <a class="btn btn-ghost" href="{{ url_for('tasks.list_tasks') }}">Annuler</a>
+            <button class="btn btn-primary" type="submit">Enregistrer</button>
+        </div>
+    </form>
+</section>
+
+<script nonce="{{ csp_nonce }}">
+(function () {
+    var tpl = document.getElementById('task-is-template');
+    var autoFld = document.getElementById('task-auto-mission-field');
+    var autoChk = document.getElementById('task-auto-after-mission');
+    var offsetFld = document.getElementById('task-auto-offset-field');
+    if (!tpl || !autoFld || !autoChk || !offsetFld) return;
+
+    function refresh() {
+        var on = tpl.checked;
+        autoFld.style.display = on ? '' : 'none';
+        // Offset only matters when auto-spawn is on.
+        offsetFld.style.display = (on && autoChk.checked) ? '' : 'none';
+        if (!on) autoChk.checked = false;
+    }
+    tpl.addEventListener('change', refresh);
+    autoChk.addEventListener('change', refresh);
+    refresh();
+})();
+</script>
+{% endblock %}

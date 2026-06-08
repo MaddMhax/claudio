@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% block title %}SSO / OIDC — Claudio{% endblock %}
+{% block content %}
+<section class="form-card">
+    <div class="sso-head">
+        <h1>Connexion SSO (OpenID Connect)</h1>
+        {% set pill = {'active': 'status-planifie', 'incomplete': 'status-preplanifie', 'disabled': 'status-termine'} %}
+        <span class="status-pill {{ pill[status.key] }}" title="État de la configuration SSO">
+            {{ status.label }}
+            {% if status.source == 'env' %}<span class="sso-src">env</span>
+            {% elif status.source == 'ui' %}<span class="sso-src">interface</span>{% endif %}
+        </span>
+    </div>
+
+    {% if status.discovery_url %}
+    <p class="hint" style="margin-top:0">
+        Fournisseur : <code>{{ status.discovery_url }}</code>
+    </p>
+    {% endif %}
+
+    <p class="hint">
+        URL de redirection détectée automatiquement :<br>
+        <span class="copy-row">
+            <code id="callback-url">{{ url_for('auth.oidc_callback', _external=true) }}</code>
+            <button type="button" class="btn btn-ghost btn-copy" id="copy-callback"
+                    data-copy-target="callback-url" title="Copier l'URL">⧉ Copier</button>
+        </span>
+        C'est cette URL exacte qui doit être déclarée chez votre fournisseur. Si elle est
+        incorrecte (mauvais schéma <code>http</code>/<code>https</code> ou mauvais domaine,
+        typique derrière un reverse-proxy), renseignez l'« URL de redirection (override) »
+        ci-dessous avec l'URL publique réelle.
+    </p>
+
+    {% if env_mode %}
+    <div class="callout callout-info">
+        La configuration SSO est définie par des <strong>variables d'environnement</strong>
+        (<code>OIDC_*</code>) et est donc en lecture seule ici. Pour la modifier depuis
+        l'interface, retirez ces variables et redémarrez l'application.
+    </div>
+    <dl class="kv">
+        <dt>État</dt><dd>{{ "Activé" if cfg else "Incomplet" }}</dd>
+        {% if cfg %}
+        <dt>Client ID</dt><dd>{{ cfg.client_id }}</dd>
+        <dt>Client secret</dt><dd>•••••••• (masqué)</dd>
+        <dt>URL de découverte</dt><dd>{{ cfg.discovery_url }}</dd>
+        <dt>URL de redirection</dt><dd>{{ cfg.redirect_uri or "(auto)" }}</dd>
+        <dt>Scopes</dt><dd>{{ cfg.scopes }}</dd>
+        <dt>Claim → utilisateur</dt><dd>{{ cfg.username_claim }}</dd>
+        <dt>Claim → nom</dt><dd>{{ cfg.name_claim }}</dd>
+        <dt>Libellé du bouton</dt><dd>{{ cfg.button_label }}</dd>
+        <dt>Auto-création</dt><dd>{{ "Oui" if cfg.auto_create else "Non" }}</dd>
+        <dt>Rôles par défaut</dt><dd>{{ cfg.default_roles | join(", ") or "—" }}</dd>
+        {% endif %}
+    </dl>
+
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="form-actions">
+        <button class="btn btn-ghost" type="button" id="test-connection"
+                data-discovery="{{ status.discovery_url }}">Tester la connexion</button>
+    </div>
+    <div class="sso-test-result" id="test-result" hidden></div>
+    {% else %}
+    <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+
+        <div class="field field-check">
+            {{ form.enabled() }} {{ form.enabled.label }}
+        </div>
+
+        <div class="field">
+            {{ form.provider.label }}
+            {{ form.provider() }}
+            <small class="hint">Pré-remplit l'URL de découverte, les scopes et le claim
+                d'identifiant adaptés au fournisseur. « Personnalisé » ne touche à rien.</small>
+        </div>
+
+        <div class="field">
+            {{ form.client_id.label }}
+            {{ form.client_id(autocomplete="off") }}
+            {% for e in form.client_id.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            {{ form.client_secret.label }}
+            {{ form.client_secret(autocomplete="new-password",
+                placeholder=('Laisser vide pour conserver le secret actuel' if secret_set else 'Collez le client secret')) }}
+            <small class="hint">
+                {% if secret_set %}Un secret est déjà enregistré (chiffré). Laisser vide pour le conserver.
+                {% else %}Stocké chiffré ; jamais réaffiché.{% endif %}
+            </small>
+            {% for e in form.client_secret.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            {{ form.discovery_url.label }}
+            {{ form.discovery_url(placeholder="https://idp.example.com/.well-known/openid-configuration") }}
+            <small class="hint warn-inline" id="warn-discovery" hidden></small>
+            {% for e in form.discovery_url.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            <div class="sso-test-line">
+                <button class="btn btn-ghost" type="button" id="test-connection">Tester la connexion</button>
+                <span class="hint">Récupère le document de découverte et affiche l'issuer + les endpoints résolus.</span>
+            </div>
+            <div class="sso-test-result" id="test-result" hidden></div>
+        </div>
+
+        <div class="field">
+            {{ form.redirect_uri.label }}
+            {{ form.redirect_uri(placeholder="https://votre-domaine/auth/oidc/callback") }}
+            <small class="hint warn-inline" id="warn-redirect" hidden></small>
+            <small class="hint">
+                Laisser vide pour utiliser l'URL détectée automatiquement (ci-dessus). À renseigner
+                derrière un reverse-proxy si le schéma/domaine détecté est faux. Doit correspondre
+                exactement à l'URL déclarée chez le fournisseur.
+            </small>
+            {% for e in form.redirect_uri.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                {{ form.scopes.label }}
+                {{ form.scopes(placeholder="openid email profile") }}
+            </div>
+            <div class="field">
+                {{ form.button_label.label }}
+                {{ form.button_label(placeholder="Connexion SSO") }}
+            </div>
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                {{ form.username_claim.label }}
+                {{ form.username_claim(placeholder="preferred_username") }}
+                <small class="hint">Google : utilisez plutôt <code>email</code>.</small>
+            </div>
+            <div class="field">
+                {{ form.name_claim.label }}
+                {{ form.name_claim(placeholder="name") }}
+            </div>
+        </div>
+
+        <div class="field field-check">
+            {{ form.auto_create() }} {{ form.auto_create.label }}
+        </div>
+
+        <div class="field">
+            {{ form.default_roles.label }}
+            {{ form.default_roles(placeholder="audit_web, audit_mobile") }}
+            <small class="hint">Appliqués aux comptes auto-créés. Laisser vide = aucun rôle.</small>
+            {% for e in form.default_roles.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="form-actions">
+            <a class="btn btn-ghost" href="{{ url_for('planning.calendar_default') }}">Retour</a>
+            <button class="btn btn-primary" type="submit">Enregistrer</button>
+        </div>
+    </form>
+    {% endif %}
+</section>
+
+<script nonce="{{ csp_nonce }}">
+(function () {
+    // ===== Copy-to-clipboard (callback URL) =====
+    var copyBtn = document.getElementById('copy-callback');
+    if (copyBtn) {
+        copyBtn.addEventListener('click', function () {
+            var el = document.getElementById(copyBtn.dataset.copyTarget);
+            if (!el) return;
+            var text = el.textContent.trim();
+            var done = function () {
+                var old = copyBtn.textContent;
+                copyBtn.textContent = '✓ Copié';
+                setTimeout(function () { copyBtn.textContent = old; }, 1500);
+            };
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).then(done, done);
+            } else {
+                var r = document.createRange(); r.selectNode(el);
+                var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+                try { document.execCommand('copy'); } catch (e) {}
+                sel.removeAllRanges(); done();
+            }
+        });
+    }
+
+    // ===== Provider presets =====
+    var PRESETS = {
+        gitlab:   { discovery: 'https://gitlab.com/.well-known/openid-configuration',
+                    scopes: 'openid email profile', username_claim: 'preferred_username' },
+        google:   { discovery: 'https://accounts.google.com/.well-known/openid-configuration',
+                    scopes: 'openid email profile', username_claim: 'email' },
+        keycloak: { discovery: 'https://VOTRE-KEYCLOAK/realms/VOTRE-REALM/.well-known/openid-configuration',
+                    scopes: 'openid email profile', username_claim: 'preferred_username' },
+        entra:    { discovery: 'https://login.microsoftonline.com/VOTRE-TENANT/v2.0/.well-known/openid-configuration',
+                    scopes: 'openid email profile', username_claim: 'preferred_username' }
+    };
+    var provider = document.getElementById('provider');
+    var discovery = document.getElementById('discovery_url');
+    var scopes = document.getElementById('scopes');
+    var usernameClaim = document.getElementById('username_claim');
+    if (provider) {
+        provider.addEventListener('change', function () {
+            var p = PRESETS[provider.value];
+            if (!p) return;  // "custom" — leave fields untouched
+            if (discovery) discovery.value = p.discovery;
+            if (scopes) scopes.value = p.scopes;
+            if (usernameClaim) usernameClaim.value = p.username_claim;
+            validateDiscovery();
+        });
+    }
+
+    // ===== Inline validation / warnings =====
+    var warnDiscovery = document.getElementById('warn-discovery');
+    var warnRedirect = document.getElementById('warn-redirect');
+    var redirect = document.getElementById('redirect_uri');
+    var SUFFIX = '/.well-known/openid-configuration';
+
+    function setWarn(el, msg) {
+        if (!el) return;
+        if (msg) { el.textContent = '⚠ ' + msg; el.hidden = false; }
+        else { el.textContent = ''; el.hidden = true; }
+    }
+    function validateDiscovery() {
+        if (!discovery) return;
+        var v = discovery.value.trim();
+        setWarn(warnDiscovery,
+            (v && v.indexOf(SUFFIX) === -1)
+                ? "L'URL ne se termine pas par " + SUFFIX + " — vérifiez l'adresse du document de découverte."
+                : '');
+    }
+    function validateRedirect() {
+        if (!redirect) return;
+        var v = redirect.value.trim();
+        var msg = '';
+        if (v.indexOf('http://') === 0) {
+            var host = v.slice(7).split('/')[0].split(':')[0];
+            if (host !== 'localhost' && host !== '127.0.0.1') {
+                msg = "URL en http:// non sécurisée — utilisez https:// (sauf en local).";
+            }
+        }
+        setWarn(warnRedirect, msg);
+    }
+    if (discovery) discovery.addEventListener('input', validateDiscovery);
+    if (redirect) redirect.addEventListener('input', validateRedirect);
+    validateDiscovery();
+    validateRedirect();
+
+    // ===== Test connection =====
+    var testBtn = document.getElementById('test-connection');
+    var result = document.getElementById('test-result');
+    function tokenInput() {
+        var f = document.querySelector('input[name=csrf_token]');
+        return f ? f.value : '';
+    }
+    if (testBtn && result) {
+        testBtn.addEventListener('click', function () {
+            var url = (discovery ? discovery.value.trim() : '') || testBtn.dataset.discovery || '';
+            result.hidden = false;
+            result.className = 'sso-test-result';
+            result.textContent = 'Test en cours…';
+            fetch("{{ url_for('sso_admin.test_connection') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': tokenInput() },
+                body: JSON.stringify({ discovery_url: url })
+            }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+              .then(function (res) {
+                var d = res.d || {};
+                if (res.ok && d.ok) {
+                    result.className = 'sso-test-result is-ok';
+                    result.innerHTML =
+                        '<strong>✓ Connexion réussie</strong>' +
+                        row('Issuer', d.issuer) +
+                        row('Authorization', d.authorization_endpoint) +
+                        row('Token', d.token_endpoint) +
+                        row('JWKS', d.jwks_uri);
+                } else {
+                    result.className = 'sso-test-result is-err';
+                    result.innerHTML = '<strong>✗ Échec</strong><div>' +
+                        escapeHtml(d.error || 'Erreur inconnue.') + '</div>';
+                }
+            }).catch(function () {
+                result.className = 'sso-test-result is-err';
+                result.textContent = '✗ Impossible de contacter le serveur.';
+            });
+        });
+    }
+    function row(label, value) {
+        if (!value) return '';
+        return '<div class="sso-test-kv"><span>' + label + '</span><code>' +
+            escapeHtml(value) + '</code></div>';
+    }
+    function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+})();
+</script>
+{% endblock %}

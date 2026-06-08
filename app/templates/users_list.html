@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Utilisateurs — Claudio{% endblock %}
+{% block content %}
+<section class="calendar-toolbar">
+    <h1 class="cal-title">Gestion des utilisateurs</h1>
+    <div class="cal-actions">
+        <a class="btn btn-primary" href="{{ url_for('users.create_user') }}">+ Nouvel utilisateur</a>
+    </div>
+</section>
+
+<nav class="tech-filter" aria-label="Filtre technique / non technique">
+    <a class="btn btn-ghost {% if tech_filter == 'all' %}is-active{% endif %}"
+       href="{{ url_for('users.list_users') }}">
+        Tous <span class="cell-dim">({{ tech_counts.all }})</span>
+    </a>
+    <a class="btn btn-ghost {% if tech_filter == 'technical' %}is-active{% endif %}"
+       href="{{ url_for('users.list_users', tech='technical') }}">
+        Techniques <span class="cell-dim">({{ tech_counts.technical }})</span>
+    </a>
+    <a class="btn btn-ghost {% if tech_filter == 'non_technical' %}is-active{% endif %}"
+       href="{{ url_for('users.list_users', tech='non_technical') }}">
+        Non techniques <span class="cell-dim">({{ tech_counts.non_technical }})</span>
+    </a>
+</nav>
+
+<table class="users-table">
+    <thead>
+        <tr>
+            <th></th>
+            <th>Nom d'utilisateur</th>
+            <th>Nom complet</th>
+            <th>Profil</th>
+            <th>Connexion</th>
+            <th>Rôles</th>
+            <th class="users-table-actions">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for u in users %}
+        <tr>
+            <td><span class="user-dot" style="--user-color: {{ u.color }}"></span></td>
+            <td><code>{{ u.username }}</code></td>
+            <td>{{ u.full_name }}</td>
+            <td>
+                {% if u.is_technical %}
+                    <span class="role-tag" style="background:rgba(245,158,11,0.15);border-color:#f59e0b;color:#fcd34d">Technique</span>
+                {% else %}
+                    <span class="role-tag" style="background:rgba(100,116,139,0.15);border-color:#64748b;color:#cbd5f5">Non technique</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if u.oidc_sub %}
+                    <span class="role-tag" style="background:rgba(59,130,246,0.15);border-color:#3b82f6;color:#93c5fd" title="Identité fédérée OIDC liée">🔗 SSO</span>
+                {% endif %}
+                {% if u.password_hash %}
+                    <span class="role-tag" style="background:rgba(100,116,139,0.15);border-color:#64748b;color:#cbd5f5" title="Connexion par mot de passe possible">🔑 Mot de passe</span>
+                {% endif %}
+                {% if not u.oidc_sub and not u.password_hash %}
+                    <span class="role-tag" style="background:rgba(239,68,68,0.15);border-color:#ef4444;color:#fca5a5" title="Aucune méthode de connexion">⚠ Aucune</span>
+                {% endif %}
+            </td>
+            <td>
+                {% for r in u.role_labels %}
+                    <span class="role-tag">{{ r }}</span>
+                {% endfor %}
+            </td>
+            <td class="users-table-actions">
+                <a class="btn btn-ghost" href="{{ url_for('users.edit_user', user_id=u.id) }}">Modifier</a>
+                {% if u.oidc_sub %}
+                <form method="post" action="{{ url_for('users.unlink_sso', user_id=u.id) }}"
+                      class="inline-form"
+                      onsubmit="return confirm('Délier l’identité SSO de « {{ u.username }} » ?{% if not u.password_hash %} Ce compte n’a pas de mot de passe : il ne pourra plus se connecter.{% endif %}');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-ghost" type="submit">Délier SSO</button>
+                </form>
+                {% endif %}
+                {% if u.id != current_user.id %}
+                <form method="post" action="{{ url_for('users.delete_user', user_id=u.id) }}"
+                      class="inline-form"
+                      onsubmit="return confirm('Supprimer l’utilisateur « {{ u.username }} » ?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-danger" type="submit">Supprimer</button>
+                </form>
+                {% endif %}
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="cell-dim" style="text-align:center;padding:24px">Aucun utilisateur dans ce filtre.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<section class="form-card form-card-wide" style="margin-top:24px">
+    <h2 style="margin-top:0">Rôles</h2>
+    <p class="cell-dim" style="margin-top:0">
+        Les rôles ci-dessous sont entièrement gérés ici : ils peuplent les choix lors
+        de l'édition d'un utilisateur ET la liste des spécialités proposées sur un
+        sous-type de mission. Deux rôles restent codés en dur, hors de ce panneau :
+        <em>Administrateur</em> et <em>Planificateur</em>.
+    </p>
+
+    <table class="users-table">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Libellé</th>
+                <th>Identifiant</th>
+                <th>Utilisateurs</th>
+                <th class="users-table-actions">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in roles %}
+            <tr>
+                <td><span class="user-dot" style="--user-color: {{ r.color }}"></span></td>
+                <td><strong>{{ r.label }}</strong></td>
+                <td><code>{{ r.key }}</code></td>
+                <td>{{ role_usage.get(r.id, 0) }}</td>
+                <td class="users-table-actions">
+                    <a class="btn btn-ghost" href="{{ url_for('users.edit_role', role_id=r.id) }}">Modifier</a>
+                    <form method="post" action="{{ url_for('users.delete_role', role_id=r.id) }}"
+                          class="inline-form"
+                          onsubmit="return confirm('Supprimer le rôle « {{ r.label }} » ? Les {{ role_usage.get(r.id, 0) }} utilisateur(s) concerné(s) le perdront ; les sous-types qui le ciblaient verront leur spécialité vidée.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-danger" type="submit">Supprimer</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="cell-dim" style="text-align:center;padding:24px">Aucun rôle pour l'instant.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <form method="post" action="{{ url_for('users.create_role') }}" style="margin-top:18px">
+        {{ role_form.hidden_tag() }}
+        <div class="field-row">
+            <div class="field">
+                {{ role_form.label.label }}
+                {{ role_form.label(placeholder='Ex : Auditeur réseau') }}
+                <small class="hint">L'identifiant interne est dérivé automatiquement (slug).</small>
+            </div>
+            <div class="field">
+                {{ role_form.color.label }}
+                {{ role_form.color(type='color') }}
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">+ Ajouter le rôle</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

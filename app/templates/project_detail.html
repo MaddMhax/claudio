@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block title %}{{ project.name }} — Claudio{% endblock %}
+{% block content %}
+<section class="calendar-toolbar">
+    <div>
+        <div class="cell-dim" style="font-size:0.85rem">{{ project.client.name }}</div>
+        <h1 class="cal-title" style="margin-top:4px">
+            {{ project.name }}
+            <span class="status-pill status-{{ 'planifie' if project.status == 'actif' else 'termine' }}"
+                  style="vertical-align:middle;margin-left:8px">
+                {{ status_labels[project.status] }}
+            </span>
+        </h1>
+        {% if project.code %}
+            <div class="cell-dim" style="font-size:0.9rem">Réf. {{ project.code }}</div>
+        {% endif %}
+    </div>
+    <div class="cal-actions">
+        <a class="btn btn-ghost" href="{{ url_for('projects.projects_list') }}">← Retour aux projets</a>
+        {% if current_user.can_manage_events %}
+        <a class="btn btn-ghost" href="{{ url_for('projects.project_edit', project_id=project.id) }}">Modifier le projet</a>
+        {% endif %}
+    </div>
+</section>
+
+{% if project.description %}
+<section class="form-card form-card-wide" style="margin-bottom:18px">
+    <p style="margin:0;white-space:pre-wrap">{{ project.description }}</p>
+</section>
+{% endif %}
+
+<section class="projects-summary" style="margin-bottom:18px">
+    <div class="summary-card">
+        <div class="summary-num">{{ missions|length }}</div>
+        <div class="summary-lbl">Missions</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-num">{{ total_person_days }}</div>
+        <div class="summary-lbl">J/H cumulés</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-num">{{ meetings|length }}</div>
+        <div class="summary-lbl">Réunions</div>
+    </div>
+    <div class="summary-card">
+        <div class="summary-num">{{ tasks|length }}</div>
+        <div class="summary-lbl">Tâches</div>
+    </div>
+</section>
+
+<section class="form-card form-card-wide" style="margin-bottom:18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <h2 style="margin:0">Missions</h2>
+        {% if current_user.can_manage_events %}
+        <a class="btn btn-primary" href="{{ url_for('planning.event_new', project_id=project.id) }}">+ Nouvelle mission</a>
+        {% endif %}
+    </div>
+    {% if missions %}
+    <div class="projects-table-wrap" style="margin-top:12px">
+    <table class="users-table projects-table">
+        <thead>
+            <tr>
+                <th>Période</th>
+                <th>Mission</th>
+                <th>Statut</th>
+                <th>Spécialité</th>
+                <th>Auditeurs</th>
+                <th class="cell-num">J/H</th>
+                {% if current_user.can_manage_events %}<th></th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for r in missions %}
+            {% set ev = r.event %}
+            <tr>
+                <td class="cell-nowrap">
+                    {% if ev.start_date == ev.end_date %}
+                        {{ ev.start_date.strftime('%d/%m/%Y') }}
+                    {% else %}
+                        {{ ev.start_date.strftime('%d/%m/%Y') }} → {{ ev.end_date.strftime('%d/%m/%Y') }}
+                    {% endif %}
+                </td>
+                <td><strong>{{ ev.title }}</strong></td>
+                <td><span class="status-pill status-{{ r.status }}">{{ r.status_label }}</span></td>
+                <td>{{ r.audit_kind_label }}</td>
+                <td>
+                    {% for u in r.auditors %}
+                        <span class="user-chip" style="--user-color: {{ u.color }}">
+                            <span class="user-dot" style="--user-color: {{ u.color }}"></span>
+                            {{ u.full_name }}
+                        </span>
+                    {% else %}
+                        <span class="cell-dim">—</span>
+                    {% endfor %}
+                </td>
+                <td class="cell-num">{{ r.person_days }}</td>
+                {% if current_user.can_manage_events %}
+                <td class="cell-nowrap">
+                    <a class="btn btn-ghost" href="{{ url_for('planning.event_edit', event_id=ev.id) }}">Modifier</a>
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    </div>
+    {% else %}
+    <p class="cell-dim" style="margin:12px 0 0">Aucune mission pour ce projet.</p>
+    {% endif %}
+</section>
+
+<section class="form-card form-card-wide" style="margin-bottom:18px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <h2 style="margin:0">Réunions</h2>
+        {% if current_user.can_manage_events %}
+        <a class="btn btn-primary" href="{{ url_for('meetings.list_meetings', project_id=project.id) }}">+ Nouvelle réunion</a>
+        {% endif %}
+    </div>
+    {% if meetings %}
+    <table class="users-table" style="margin-top:12px">
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>Date</th>
+                <th>Type</th>
+                {% if current_user.can_manage_events %}<th></th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for m in meetings %}
+            <tr>
+                <td><strong>{{ m.name }}</strong></td>
+                <td>{{ m.date.strftime('%d/%m/%Y') }}</td>
+                <td>
+                    {% if m.category %}
+                        <span class="task-status-pill" style="--status-color: {{ m.category.color }}">{{ m.category.name }}</span>
+                    {% else %}
+                        <span class="cell-dim">—</span>
+                    {% endif %}
+                </td>
+                {% if current_user.can_manage_events %}
+                <td class="users-table-actions">
+                    <form method="post" action="{{ url_for('meetings.delete_meeting', meeting_id=m.id) }}"
+                          class="inline-form"
+                          onsubmit="return confirm('Supprimer la réunion « {{ m.name }} » ?');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-danger" type="submit">Supprimer</button>
+                    </form>
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="cell-dim" style="margin:12px 0 0">Aucune réunion pour ce projet.</p>
+    {% endif %}
+</section>
+
+<section class="form-card form-card-wide">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+        <h2 style="margin:0">Tâches</h2>
+        {% if current_user.is_admin %}
+        <a class="btn btn-primary" href="{{ url_for('tasks.list_tasks', project_id=project.id) }}">+ Nouvelle tâche</a>
+        {% endif %}
+    </div>
+    {% if tasks %}
+    <table class="users-table" style="margin-top:12px">
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>Date</th>
+                <th>Statut</th>
+                {% if current_user.is_admin %}<th></th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in tasks %}
+            <tr>
+                <td><strong>{{ t.name }}</strong></td>
+                <td>{{ t.due_date.strftime('%d/%m/%Y') if t.due_date else '—' }}</td>
+                <td>
+                    {% if t.status %}
+                        <span class="task-status-pill" style="--status-color: {{ t.status.color }}">{{ t.status.name }}</span>
+                    {% else %}
+                        <span class="cell-dim">—</span>
+                    {% endif %}
+                </td>
+                {% if current_user.is_admin %}
+                <td class="users-table-actions">
+                    <a class="btn btn-ghost" href="{{ url_for('tasks.edit_task', task_id=t.id) }}">Modifier</a>
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="cell-dim" style="margin:12px 0 0">Aucune tâche pour ce projet.</p>
+    {% endif %}
+</section>
+{% endblock %}

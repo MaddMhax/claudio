@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Modifier le client' if mode == 'edit' else 'Nouveau client' }} — Claudio{% endblock %}
+{% block content %}
+<section class="form-card">
+    <h1>{{ 'Modifier le client' if mode == 'edit' else 'Nouveau client' }}</h1>
+
+    <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+
+        <div class="field">
+            {{ form.name.label }}
+            {{ form.name(autofocus=true) }}
+            {% for e in form.name.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            {{ form.notes.label }}
+            {{ form.notes(rows=4, placeholder='Contacts, contexte, contraintes spécifiques…') }}
+            <small class="hint">Notes internes facultatives, visibles uniquement par l'équipe.</small>
+            {% for e in form.notes.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="form-actions">
+            <a class="btn btn-ghost" href="{{ url_for('clients.list_clients') }}">Annuler</a>
+            <button class="btn btn-primary" type="submit">{{ 'Enregistrer' if mode == 'edit' else 'Créer' }}</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

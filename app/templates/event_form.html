@@ -1,0 +1,907 @@
+{% extends "base.html" %}
+{% set is_absence = (kind == 'absence') %}
+{% set new_title = 'Nouveau congé / formation' if is_absence else 'Nouvelle mission (préplanifiée)' %}
+{% block title %}{{ 'Modifier l’événement' if mode == 'edit' else new_title }} — Claudio{% endblock %}
+{% block content %}
+<section class="form-card form-card-wide">
+    <h1>{{ 'Modifier l’événement' if mode == 'edit' else new_title }}</h1>
+
+    {# The préplanifié → devis workflow only applies to technical missions. #}
+    {% set show_workflow = (not is_absence) and ((mode == 'new') or (event and event.meeting_type and event.meeting_type.is_technical)) %}
+
+    {% if show_workflow %}
+    <ol class="workflow-steps">
+        <li {% if mode == 'new' or (event and event.status == 'preplanifie') %}class="step-current"{% else %}class="step-done"{% endif %}>
+            <span class="step-num">1</span> Préplanifier
+        </li>
+        <li class="step-pending">
+            <span class="step-num">2</span> Réunion de cadrage
+        </li>
+        <li {% if event and event.status == 'planifie' %}class="step-done"{% else %}class="step-pending"{% endif %}>
+            <span class="step-num">3</span> Valider le devis → Planifié
+        </li>
+    </ol>
+    {% if mode == 'new' %}
+    <small class="hint" style="display:block;margin-bottom:14px">
+        Le workflow ci-dessus s'applique uniquement aux missions techniques (Audit de code, MEEXT, Revue SSI). Les autres événements (réunion, congé, formation…) sont créés directement en « Planifié ».
+    </small>
+    {% endif %}
+    {% endif %}
+
+    {% if mode == 'edit' %}
+    <div class="status-bar">
+        <div class="status-left">
+            {% if event.meeting_type and event.meeting_type.is_technical %}
+            <span class="status-pill status-{{ event.status }}">
+                {{ 'Préplanifié' if event.status == 'preplanifie' else 'Planifié' }}
+            </span>
+            {% else %}
+            <span class="status-pill status-planifie">Planifié</span>
+            {% endif %}
+            {% if event.fpr_missing %}
+                <span class="status-pill status-warn">⚠️ FPR non reçue</span>
+            {% elif event.audit_kind and event.fpr_url %}
+                <a class="status-pill status-link" href="{{ event.fpr_url }}" target="_blank" rel="noopener">
+                    🔗 Voir la FPR
+                </a>
+            {% endif %}
+        </div>
+        {% if event.meeting_type and event.meeting_type.is_technical and event.status == 'preplanifie' %}
+        <form method="post" action="{{ url_for('planning.event_validate_devis', event_id=event.id) }}" class="inline-form"
+              onsubmit="return confirm('Le devis est-il validé par le client ? L’événement passera en « Planifié ».');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-primary" type="submit">✓ Valider le devis</button>
+        </form>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if mode == 'edit' %}
+    <details class="date-history meta-details">
+        <summary>
+            <span>Détails</span>
+        </summary>
+        <ul class="date-history-list meta-details-list">
+            <li>
+                <div class="date-history-when">Création</div>
+                <div class="date-history-what">
+                    {% if event.created_by %}
+                        par <strong>{{ event.created_by.full_name }}</strong>
+                    {% else %}
+                        par <em>utilisateur supprimé</em>
+                    {% endif %}
+                    le <strong>{{ event.created_at | localdt }}</strong>
+                </div>
+            </li>
+            {% if event.updated_at %}
+            <li>
+                <div class="date-history-when">Dernière modification</div>
+                <div class="date-history-what">
+                    {% if event.updated_by %}
+                        par <strong>{{ event.updated_by.full_name }}</strong>
+                    {% else %}
+                        par <em>utilisateur supprimé</em>
+                    {% endif %}
+                    le <strong>{{ event.updated_at | localdt }}</strong>
+                </div>
+            </li>
+            {% endif %}
+        </ul>
+    </details>
+    {% endif %}
+
+    {% if mode == 'edit' and event.date_history %}
+    <details class="date-history" open>
+        <summary>
+            <span>Historique des dates</span>
+            <span class="date-history-count">{{ event.date_history|length }}</span>
+        </summary>
+        <ul class="date-history-list">
+            {% for h in event.date_history %}
+            <li>
+                <div class="date-history-when">
+                    {{ h.changed_at | localdt }}
+                    {% if h.changed_by %}· par {{ h.changed_by.full_name }}{% endif %}
+                </div>
+                <div class="date-history-what">
+                    précédemment
+                    {% if h.previous_status == 'preplanifie' %}
+                        <span class="status-pill status-preplanifie">Préplanifié</span>
+                    {% elif h.previous_status == 'planifie' %}
+                        <span class="status-pill status-planifie">Planifié</span>
+                    {% endif %}
+                    {% if h.previous_start_date == h.previous_end_date %}
+                        du <strong>{{ h.previous_start_date.strftime('%d/%m/%Y') }}</strong>
+                    {% else %}
+                        du <strong>{{ h.previous_start_date.strftime('%d/%m/%Y') }}</strong>
+                        au <strong>{{ h.previous_end_date.strftime('%d/%m/%Y') }}</strong>
+                    {% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+    </details>
+    {% endif %}
+
+    <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+        <input type="hidden" name="kind" value="{{ kind }}">
+        {% if is_absence %}
+        {# These SelectFields aren't rendered for absences; submit their neutral
+           value so WTForms coercion/choice validation passes. #}
+        <input type="hidden" name="meeting_subtype_id" value="0">
+        <input type="hidden" name="project_id" value="0">
+        {% endif %}
+
+        {% if not is_absence %}
+        {# Project first: a technical mission always belongs to a project, so it
+           is picked before naming the mission. The list refreshes live (see JS)
+           so a project created via the first option is pickable on return. #}
+        <div class="field" id="project-field">
+            <label for="project_id">
+                {{ form.project_id.label.text }}
+                <span id="project-required" class="required-mark">*</span>
+            </label>
+            <select id="project_id" name="project_id" autofocus
+                    data-options-url="{{ url_for('projects.options_json') }}"
+                    data-new-url="{{ url_for('projects.project_new') }}">
+                {# Default to "Hors projet" (0), never the create-new sentinel,
+                   when no project is chosen yet. #}
+                {% set selected_pid = form.project_id.data or 0 %}
+                <option value="__new__" class="project-new-opt">＋ Créer un nouveau projet…</option>
+                {% for value, label in form.project_id.choices %}
+                <option value="{{ value }}" {% if selected_pid == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <small class="hint">Obligatoire pour toute mission rattachée à un client.
+                <a href="{{ url_for('projects.projects_list') }}" target="_blank" rel="noopener">Gérer les projets ↗</a>
+            </small>
+            {% for e in form.project_id.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+        {% endif %}
+
+        {# Mission type + spécialité (sous-type) sit between project and title. #}
+        <div class="field-row">
+            <div class="field">
+                <label for="meeting_type_id">{{ "Type d'absence" if is_absence else "Type de mission" }} <span class="required-mark">*</span></label>
+                <select id="meeting_type_id" name="meeting_type_id">
+                    <option value="0" data-technical="false" data-blocks-assignments="false" data-allows-client="false">— choisir —</option>
+                    {% for mt in form.mission_types %}
+                    <option value="{{ mt.id }}"
+                            data-technical="{{ 'true' if mt.is_technical else 'false' }}"
+                            data-blocks-assignments="{{ 'true' if mt.blocks_assignments else 'false' }}"
+                            data-allows-client="{{ 'true' if mt.allows_client else 'false' }}"
+                            {% if form.meeting_type_id.data and form.meeting_type_id.data == mt.id %}selected{% endif %}>{{ mt.name }}</option>
+                    {% endfor %}
+                </select>
+                {% for e in form.meeting_type_id.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            {% if not is_absence %}
+            <div class="field" id="subtype-field">
+                <label for="meeting_subtype_id">
+                    {{ form.meeting_subtype_id.label.text }}
+                    <span id="subtype-required" class="required-mark" style="display:none">*</span>
+                </label>
+                <select id="meeting_subtype_id" name="meeting_subtype_id">
+                    <option value="0" data-meeting-type-id="" data-audit-kind="">— aucun —</option>
+                    {% for s in form.mission_subtypes %}
+                    <option value="{{ s.id }}"
+                            data-meeting-type-id="{{ s.meeting_type_id }}"
+                            data-audit-kind="{{ s.role.key if s.role else '' }}"
+                            data-name="{{ s.name }}"
+                            {% if form.meeting_subtype_id.data and form.meeting_subtype_id.data == s.id %}selected{% endif %}>{{ s.name }}</option>
+                    {% endfor %}
+                </select>
+                <small class="hint">Le sous-type définit l'éventuelle spécialité (web / mobile / code). Les pentesters spécialisés sont proposés en premier (★).</small>
+                {% for e in form.meeting_subtype_id.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="field">
+            {{ form.title.label }}
+            {{ form.title(autofocus=true) if is_absence else form.title() }}
+            {% for e in form.title.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                {{ form.start_date.label }}
+                {{ form.start_date(type="date") }}
+                {% for e in form.start_date.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ form.end_date.label }}
+                {{ form.end_date(type="date") }}
+                {% for e in form.end_date.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            {% if not is_absence %}
+            <div class="field">
+                <label for="jh_count">JH</label>
+                <input type="number" id="jh_count" name="jh_count" min="1" max="365" step="1"
+                       placeholder="Jours-homme" inputmode="numeric"
+                       {% if prefill_jh %}value="{{ prefill_jh }}"{% endif %}>
+                <small class="hint">Recalcule automatiquement la date de fin : <em>fin = début + ⌈JH / nb pentesters⌉ jours ouvrés</em>.</small>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                {{ form.start_time.label }}
+                {{ form.start_time(type="time") }}
+                {% for e in form.start_time.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ form.end_time.label }}
+                {{ form.end_time(type="time") }}
+                {% for e in form.end_time.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+        </div>
+        <div id="past-date-warn" class="past-date-warn" style="display:none">
+            <span class="warn-icon">⚠️</span>
+            <span id="past-date-warn-msg"></span>
+        </div>
+
+        <div class="field">
+            <label>
+                {{ form.participants.label.text }}
+                <span class="required-mark">*</span>
+            </label>
+            {% set selected_ids = form.participants.data or [] %}
+            <div id="participants-list" class="participants-list"
+                 {% if mode == 'edit' %}data-event-id="{{ event.id }}"{% endif %}>
+                {% for u in form.team_members %}
+                <label class="participant-row"
+                       data-user-id="{{ u.id }}"
+                       data-roles="{{ u.roles|join(',') }}"
+                       data-technical="{{ 'true' if u.is_technical else 'false' }}"
+                       data-name="{{ u.full_name }}">
+                    <input type="checkbox" name="participants" value="{{ u.id }}"
+                           class="participant-check"
+                           {% if u.id in selected_ids %}checked{% endif %}>
+                    <span class="user-dot" style="--user-color: {{ u.color }}"></span>
+                    <span class="participant-id">
+                        <span class="participant-name">{{ u.full_name }}</span>
+                        <span class="participant-role cell-dim">{{ u.role_label }}</span>
+                    </span>
+                    <span class="participant-prio" hidden>★ Spécialité</span>
+                    <span class="participant-avail cell-dim" data-avail-status>—</span>
+                </label>
+                {% endfor %}
+            </div>
+            <small class="hint">
+                {% if is_absence %}
+                    Au moins un collaborateur est obligatoire — techniques comme non-techniques peuvent être assignés.
+                    L'absence les rend indisponibles pour toute mission qui chevauche la période.
+                {% else %}
+                    Au moins un pentester est obligatoire. ★ : spécialité correspondant à la mission (à privilégier).
+                    Disponibilité sur la période — sont considérés comme occupés les missions techniques
+                    (préplanifié inclus) et les types bloquants (Congé, Formation) ; réunions et restitutions ne bloquent pas.
+                {% endif %}
+            </small>
+            {% for e in form.participants.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        {% if not is_absence %}
+        <div id="fpr-block" class="fpr-block">
+            <div class="field-row">
+                <div class="field fpr-toggle">
+                    <label class="checkbox-inline">
+                        {{ form.fpr_received(id="fpr_received") }}
+                        <span>FPR reçue ?</span>
+                    </label>
+                    <small class="hint">Une mission ne peut être planifiée tant que la FPR n'a pas été reçue.</small>
+                </div>
+                <div class="field" id="fpr-url-wrap">
+                    {{ form.fpr_url.label }}
+                    {{ form.fpr_url(id="fpr_url", type="url", placeholder="https://...") }}
+                    {% for e in form.fpr_url.errors %}<small class="err">{{ e }}</small>{% endfor %}
+                </div>
+            </div>
+            <div id="fpr-warning" class="fpr-warning">
+                <span class="warn-icon">⚠️</span>
+                <span>FPR non reçue — la mission ne pourra pas être planifiée tant que ce n'est pas le cas.</span>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="field">
+            {{ form.description.label }}
+            {{ form.description(rows=4) }}
+        </div>
+
+        {% if not is_absence %}
+        <div class="field">
+            {{ form.difficulties.label }}
+            {{ form.difficulties(rows=4, placeholder='Pour les missions : pannes, blocages techniques, accès tardif, etc.') }}
+            <small class="hint">Notes post-mortem visibles dans la synthèse Projets.</small>
+        </div>
+        {% endif %}
+
+        <div class="form-actions">
+            <a class="btn btn-ghost" href="{{ url_for('planning.calendar_default') }}">Annuler</a>
+            {% if mode == 'edit' %}
+                <button form="delete-form" class="btn btn-danger" type="submit"
+                        onclick="return confirm('Supprimer cet événement ?');">Supprimer</button>
+            {% endif %}
+            {% if is_absence %}
+            <button class="btn btn-primary" type="submit">{{ 'Enregistrer' if mode == 'edit' else 'Créer' }}</button>
+            {% else %}
+            <button class="btn btn-primary" type="submit">{{ 'Enregistrer' if mode == 'edit' else 'Créer (préplanifié)' }}</button>
+            <button class="btn btn-primary" type="submit" name="action" value="validate">Valider</button>
+            {% endif %}
+        </div>
+    </form>
+
+    {% if mode == 'edit' %}
+    <form id="delete-form" method="post"
+          action="{{ url_for('planning.event_delete', event_id=event.id) }}"
+          style="display:none">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    </form>
+    {% endif %}
+</section>
+
+<script nonce="{{ csp_nonce }}">
+window.__FR_HOLIDAYS = {{ holidays_iso|tojson }};
+
+// ===== JH → auto-compute end_date =====
+// Pure UI helper: end_date = start_date + ceil(JH / nb pentesters cochés) - 1
+// working days (Mon–Fri, French holidays excluded). Triggers a 'change' on the
+// end_date input so the existing availability fetch picks the new range up.
+(function () {
+    var jhEl = document.getElementById('jh_count');
+    var startEl = document.querySelector('input[name="start_date"]');
+    var endEl = document.querySelector('input[name="end_date"]');
+    var listEl = document.getElementById('participants-list');
+    if (!jhEl || !startEl || !endEl || !listEl) return;
+
+    var HOLIDAYS = new Set(window.__FR_HOLIDAYS || []);
+
+    function isoFromDate(d) {
+        return d.getUTCFullYear() + '-'
+            + String(d.getUTCMonth() + 1).padStart(2, '0') + '-'
+            + String(d.getUTCDate()).padStart(2, '0');
+    }
+    function isWorkableIso(iso) {
+        var p = iso.split('-');
+        var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+        var wd = d.getUTCDay();
+        if (wd === 0 || wd === 6) return false;
+        return !HOLIDAYS.has(iso);
+    }
+    function addWorkingDays(startIso, n) {
+        if (n <= 0) return startIso;
+        var p = startIso.split('-');
+        var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
+        var counted = 0;
+        while (counted < n) {
+            d.setUTCDate(d.getUTCDate() + 1);
+            if (isWorkableIso(isoFromDate(d))) counted += 1;
+        }
+        return isoFromDate(d);
+    }
+    function countCheckedParticipants() {
+        var n = 0;
+        Array.prototype.forEach.call(
+            listEl.querySelectorAll('.participant-check'),
+            function (cb) {
+                var row = cb.closest('.participant-row');
+                if (cb.checked && !(row && row.hidden)) n += 1;
+            }
+        );
+        return n;
+    }
+
+    function refresh() {
+        var jh = parseInt(jhEl.value, 10);
+        if (!jh || jh < 1) return;
+        if (!startEl.value || !/^\d{4}-\d{2}-\d{2}$/.test(startEl.value)) return;
+        var n = countCheckedParticipants();
+        if (!n) return;
+        var perPentester = Math.ceil(jh / n);
+        var newEnd = addWorkingDays(startEl.value, perPentester - 1);
+        if (newEnd !== endEl.value) {
+            endEl.value = newEnd;
+            // Cascades: availability fetch + past-date banner listen on this.
+            endEl.dispatchEvent(new Event('change'));
+        }
+    }
+    jhEl.addEventListener('input', refresh);
+    startEl.addEventListener('change', refresh);
+    listEl.addEventListener('change', function (e) {
+        if (e.target && e.target.classList
+            && e.target.classList.contains('participant-check')) {
+            refresh();
+        }
+    });
+    // No refresh() on init: only react once the user supplies a JH value, so
+    // we never silently overwrite an end_date the planificateur typed by hand.
+})();
+
+// ===== Keep end_date in step with start_date =====
+// When the planificateur moves the start date, an untouched end_date can end up
+// in the wrong month. Snap the end date onto the start so it lands in the start's
+// month in two cases:
+//   1. end is empty or *before* start (forward move into a later month — the old
+//      end is now an invalid, earlier date);
+//   2. start is in the *past* (retro-saisie) and end is still in a different
+//      month — e.g. picking a past start while end sits on today's month.
+// A later end_date in the *same* month (a deliberate multi-day range) is left
+// alone, and when a JH value is set the JH helper above owns the end date, so we
+// stand down to avoid fighting its computed (possibly cross-month) range.
+(function () {
+    var startEl = document.querySelector('input[name="start_date"]');
+    var endEl = document.querySelector('input[name="end_date"]');
+    var jhEl = document.getElementById('jh_count');
+    if (!startEl || !endEl) return;
+
+    function todayISO() {
+        var d = new Date();
+        return d.getFullYear() + '-'
+            + String(d.getMonth() + 1).padStart(2, '0') + '-'
+            + String(d.getDate()).padStart(2, '0');
+    }
+    function sameMonth(a, b) {  // 'YYYY-MM-DD' → compare 'YYYY-MM'
+        return a.slice(0, 7) === b.slice(0, 7);
+    }
+
+    startEl.addEventListener('change', function () {
+        var s = startEl.value;
+        if (!s || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return;
+        // A JH value means the JH→end helper owns the end date — don't interfere.
+        var jhSet = jhEl && parseInt(jhEl.value, 10) >= 1;
+        var startInPast = s < todayISO();
+        var snap = !endEl.value
+            || endEl.value < s
+            || (startInPast && !jhSet && !sameMonth(endEl.value, s));
+        if (snap) {
+            endEl.value = s;
+            // Cascades: availability fetch + past-date banner listen on this.
+            endEl.dispatchEvent(new Event('change'));
+        }
+    });
+})();
+
+// ===== Subtype: filter options by chosen meeting type =====
+// Each <option data-meeting-type-id="..."> belongs to a specific type. When the
+// type changes, options that don't match are hidden and the selection is reset
+// if the previously chosen subtype no longer belongs to the new type. The
+// subtype field is required iff the chosen meeting type is technical.
+(function () {
+    var typeEl = document.getElementById('meeting_type_id');
+    var subEl = document.getElementById('meeting_subtype_id');
+    var subField = document.getElementById('subtype-field');
+    var subMark = document.getElementById('subtype-required');
+    if (!typeEl || !subEl || !subField) return;
+
+    function refresh() {
+        var typeOpt = typeEl.options[typeEl.selectedIndex];
+        var typeId = typeOpt ? typeOpt.value : '0';
+        var isTech = typeOpt && typeOpt.dataset.technical === 'true';
+        var subOptions = Array.prototype.slice.call(subEl.options);
+        var hasMatching = false;
+        subOptions.forEach(function (opt) {
+            if (opt.value === '0') {
+                opt.hidden = false;
+                return;
+            }
+            var matches = opt.dataset.meetingTypeId === typeId;
+            opt.hidden = !matches;
+            if (matches) hasMatching = true;
+        });
+        // Reset selection if it no longer belongs to the chosen type.
+        var curOpt = subEl.options[subEl.selectedIndex];
+        if (curOpt && curOpt.hidden) {
+            subEl.value = '0';
+        }
+        // Hide the whole field when no subtypes exist for this type.
+        subField.style.display = hasMatching ? '' : 'none';
+        if (subMark) subMark.style.display = (isTech && hasMatching) ? '' : 'none';
+        // Cascade: FPR block + participant re-sort listen on the subtype change.
+        subEl.dispatchEvent(new Event('change'));
+    }
+    typeEl.addEventListener('change', refresh);
+    refresh();
+})();
+
+// ===== FPR block visibility — driven by the subtype's audit_kind =====
+(function () {
+    var subEl = document.getElementById('meeting_subtype_id');
+    var recvEl = document.getElementById('fpr_received');
+    var block = document.getElementById('fpr-block');
+    var urlWrap = document.getElementById('fpr-url-wrap');
+    var warn = document.getElementById('fpr-warning');
+
+    function currentKind() {
+        if (!subEl) return '';
+        var opt = subEl.options[subEl.selectedIndex];
+        return (opt && opt.dataset.auditKind) || '';
+    }
+
+    function refresh() {
+        var hasKind = !!currentKind();
+        if (!block) return;
+        block.style.display = hasKind ? '' : 'none';
+        if (!hasKind) {
+            if (recvEl) recvEl.checked = false;
+            return;
+        }
+        var received = recvEl && recvEl.checked;
+        if (urlWrap) urlWrap.style.display = received ? '' : 'none';
+        if (warn) warn.style.display = received ? 'none' : '';
+    }
+    if (subEl) subEl.addEventListener('change', refresh);
+    if (recvEl) recvEl.addEventListener('change', refresh);
+    refresh();
+})();
+
+// The Project field is always shown for technical missions (it's rendered only
+// for them and a project is mandatory), so it no longer toggles on the chosen
+// mission type — it's statically visible and required.
+
+// ===== Project dropdown: "Créer un nouveau projet" + live refresh =====
+// First option opens the project-creation page in a new tab. The project list
+// is re-fetched when the dropdown is about to open and when the user returns to
+// this tab (e.g. after creating the project) — no full page reload.
+(function () {
+    var sel = document.getElementById('project_id');
+    if (!sel) return;
+    var NEW = '__new__';
+    var optionsUrl = sel.dataset.optionsUrl;
+    var newUrl = sel.dataset.newUrl;
+    var lastValue = sel.value;
+
+    sel.addEventListener('change', function () {
+        if (sel.value === NEW) {
+            if (newUrl) window.open(newUrl, '_blank', 'noopener');
+            // Never leave the sentinel selected — revert to the prior choice.
+            sel.value = (lastValue === NEW) ? '0' : lastValue;
+        }
+        lastValue = sel.value;
+    });
+
+    var refreshing = false;
+    function refresh() {
+        if (!optionsUrl || refreshing) return;
+        refreshing = true;
+        fetch(optionsUrl, { headers: { 'X-Requested-With': 'fetch' } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) {
+                if (!data || !data.options) return;
+                // Never keep the create-new sentinel as the resting value;
+                // fall back to "Hors projet" (0).
+                var current = (sel.value && sel.value !== NEW) ? sel.value : '0';
+                Array.prototype.slice.call(sel.options).forEach(function (o) {
+                    if (o.value !== NEW) o.remove();
+                });
+                data.options.forEach(function (opt) {
+                    var o = document.createElement('option');
+                    o.value = String(opt.value);
+                    o.textContent = opt.label;
+                    sel.appendChild(o);
+                });
+                var stillThere = Array.prototype.some.call(sel.options, function (o) {
+                    return o.value === current;
+                });
+                sel.value = stillThere ? current : '0';
+                lastValue = sel.value;
+            })
+            .catch(function () {})
+            .then(function () { refreshing = false; });
+    }
+
+    sel.addEventListener('mousedown', refresh);
+    window.addEventListener('focus', refresh);
+})();
+
+// ===== Auto-generate the mission title = "<projet> <sous-type>" =====
+// New technical missions only. The title is prefilled from the chosen project
+// name + mission subtype and kept in sync while the user hasn't typed their own
+// title (we stop overwriting as soon as the field diverges from our last value).
+{% if mode == 'new' %}
+(function () {
+    var titleEl = document.querySelector('input[name="title"]');
+    var projectEl = document.getElementById('project_id');
+    var subEl = document.getElementById('meeting_subtype_id');
+    if (!titleEl || !projectEl || !subEl) return;  // not the technical flow
+
+    var lastAuto = '';
+
+    function projectName() {
+        var opt = projectEl.options[projectEl.selectedIndex];
+        if (!opt || opt.value === '0' || opt.value === '__new__') return '';
+        return (opt.textContent || '').trim();
+    }
+    function subtypeName() {
+        var opt = subEl.options[subEl.selectedIndex];
+        if (!opt || opt.value === '0') return '';
+        return (opt.dataset.name || '').trim();
+    }
+    function rebuild() {
+        var parts = [];
+        var p = projectName(); if (p) parts.push(p);
+        var s = subtypeName(); if (s) parts.push(s);
+        if (!parts.length) return;
+        var auto = parts.join(' ');
+        // Only fill while the user hasn't supplied their own title.
+        if (titleEl.value === '' || titleEl.value === lastAuto) {
+            titleEl.value = auto;
+            lastAuto = auto;
+        }
+    }
+    projectEl.addEventListener('change', rebuild);
+    subEl.addEventListener('change', rebuild);
+    rebuild();
+})();
+{% endif %}
+
+// ===== Past-date info banner (non-blocking) =====
+(function () {
+    var start = document.querySelector('input[name="start_date"]');
+    var end = document.querySelector('input[name="end_date"]');
+    var warn = document.getElementById('past-date-warn');
+    var msg = document.getElementById('past-date-warn-msg');
+    if (!start || !end || !warn || !msg) return;
+
+    function todayISO() {
+        var d = new Date();
+        var m = String(d.getMonth() + 1).padStart(2, '0');
+        var day = String(d.getDate()).padStart(2, '0');
+        return d.getFullYear() + '-' + m + '-' + day;
+    }
+
+    function refresh() {
+        var today = todayISO();
+        var startPast = start.value && start.value < today;
+        var endPast = end.value && end.value < today;
+        if (!startPast && !endPast) {
+            warn.style.display = 'none';
+            return;
+        }
+        if (startPast && endPast) {
+            msg.textContent = "Cet événement est entièrement dans le passé. Vous pouvez tout de même l'enregistrer (rétro-saisie).";
+        } else if (startPast) {
+            msg.textContent = "La date de début est dans le passé. Vous pouvez tout de même enregistrer l'événement.";
+        } else {
+            msg.textContent = "La date de fin est dans le passé. Vous pouvez tout de même enregistrer l'événement.";
+        }
+        warn.style.display = '';
+    }
+    start.addEventListener('change', refresh);
+    end.addEventListener('change', refresh);
+    refresh();
+})();
+
+// ===== Restrict participants to technical users for technical missions =====
+// Auditeurs only — planificateurs / admins are hidden (and unchecked) when the
+// selected mission type is flagged is_technical. They reappear for any other
+// type. A small notice replaces the list when nothing is selectable, which
+// shouldn't happen with the seeded team but stays safe under custom data.
+(function () {
+    var typeEl = document.getElementById('meeting_type_id');
+    var listEl = document.getElementById('participants-list');
+    if (!typeEl || !listEl) return;
+
+    var notice = document.createElement('div');
+    notice.className = 'participants-notice cell-dim';
+    notice.hidden = true;
+    notice.textContent = "Aucun auditeur technique n'est défini. Créez-en un dans « Utilisateurs » avant d'assigner une mission technique.";
+    listEl.parentNode.insertBefore(notice, listEl.nextSibling);
+
+    function refresh() {
+        var opt = typeEl.options[typeEl.selectedIndex];
+        var techOnly = opt && opt.dataset.technical === 'true';
+        var rows = listEl.querySelectorAll('.participant-row');
+        var visibleCount = 0;
+        Array.prototype.forEach.call(rows, function (row) {
+            var isTech = row.dataset.technical === 'true';
+            var hide = techOnly && !isTech;
+            row.hidden = hide;
+            if (hide) {
+                var cb = row.querySelector('.participant-check');
+                if (cb && cb.checked) cb.checked = false;
+            } else {
+                visibleCount += 1;
+            }
+        });
+        notice.hidden = visibleCount > 0;
+        listEl.style.display = visibleCount > 0 ? '' : 'none';
+        // Re-run the specialty sort so newly-visible rows land back in
+        // alphabetical / prio order (sort listens on subtype.change).
+        var subEl = document.getElementById('meeting_subtype_id');
+        if (subEl) subEl.dispatchEvent(new Event('change'));
+    }
+
+    typeEl.addEventListener('change', refresh);
+    refresh();
+})();
+
+// ===== Live participant re-sort by mission specialty =====
+// Rows with a matching role come first and get a "★ Spécialité" chip so the
+// planificateur sees the priority pick at a glance. Hidden rows (filtered out
+// by the technical-only restriction) keep their relative order at the bottom.
+// data-audit-kind on the subtype option carries the Role.key directly — match
+// it against the user's roles list, no lookup table needed.
+(function () {
+    var subEl = document.getElementById('meeting_subtype_id');
+    var listEl = document.getElementById('participants-list');
+    if (!subEl || !listEl) return;
+
+    function currentKind() {
+        var opt = subEl.options[subEl.selectedIndex];
+        return (opt && opt.dataset.auditKind) || '';
+    }
+
+    function reorder() {
+        var matchRole = currentKind() || null;
+        var rows = Array.prototype.slice.call(
+            listEl.querySelectorAll('.participant-row')
+        );
+
+        var decorated = rows.map(function (row) {
+            var name = row.dataset.name || '';
+            var roles = (row.dataset.roles || '').split(',').filter(Boolean);
+            var matches = matchRole !== null && roles.indexOf(matchRole) !== -1;
+            return { row: row, name: name, matches: matches, hidden: row.hidden };
+        });
+
+        decorated.sort(function (a, b) {
+            if (a.hidden !== b.hidden) return a.hidden ? 1 : -1;
+            if (a.matches !== b.matches) return a.matches ? -1 : 1;
+            return a.name.localeCompare(b.name, 'fr');
+        });
+
+        decorated.forEach(function (d) {
+            var chip = d.row.querySelector('.participant-prio');
+            if (chip) chip.hidden = !d.matches;
+            d.row.classList.toggle('is-prio', d.matches);
+            listEl.appendChild(d.row); // re-append reorders in place
+        });
+    }
+
+    subEl.addEventListener('change', reorder);
+    reorder();
+})();
+
+// ===== Live availability status on each participant row =====
+// When the mission type is technical (or blocking — Congé / Formation),
+// fetch each pentester's availability for the chosen date range and fill
+// the per-row status slot. Purely informational.
+(function () {
+    var typeEl = document.getElementById('meeting_type_id');
+    var startEl = document.querySelector('input[name="start_date"]');
+    var endEl = document.querySelector('input[name="end_date"]');
+    var listEl = document.getElementById('participants-list');
+    if (!typeEl || !startEl || !endEl || !listEl) return;
+
+    var editingEventId = listEl.dataset.eventId || '';
+    var fetchToken = 0;
+
+    function shouldShow() {
+        var opt = typeEl.options[typeEl.selectedIndex];
+        if (!opt) return false;
+        return opt.dataset.technical === 'true'
+            || opt.dataset.blocksAssignments === 'true';
+    }
+
+    function isValidISODate(s) {
+        return /^\d{4}-\d{2}-\d{2}$/.test(s);
+    }
+
+    function fmtDate(iso) {
+        var p = iso.split('-');
+        return p[2] + '/' + p[1] + '/' + p[0];
+    }
+
+    function escapeHtml(s) {
+        return String(s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function describeConflicts(conflicts) {
+        return conflicts.map(function (c) {
+            var range = (c.start === c.end)
+                ? fmtDate(c.start)
+                : fmtDate(c.start) + '→' + fmtDate(c.end);
+            var label = escapeHtml(c.title) + ' (' + range;
+            if (c.kind) label += ' · ' + escapeHtml(c.kind);
+            else if (c.type) label += ' · ' + escapeHtml(c.type);
+            return label + ')';
+        }).join(', ');
+    }
+
+    function eachRow(cb) {
+        Array.prototype.forEach.call(
+            listEl.querySelectorAll('.participant-row'), cb
+        );
+    }
+
+    function setRowStatus(row, html, kind) {
+        row.classList.remove('avail-free', 'avail-busy', 'avail-unknown');
+        if (kind) row.classList.add(kind);
+        var slot = row.querySelector('[data-avail-status]');
+        if (slot) slot.innerHTML = html;
+    }
+
+    function clearStatuses(placeholder) {
+        eachRow(function (row) {
+            setRowStatus(row, placeholder || '', null);
+        });
+    }
+
+    function applyAvailability(users) {
+        var byId = {};
+        users.forEach(function (u) { byId[u.id] = u; });
+        eachRow(function (row) {
+            var id = parseInt(row.dataset.userId, 10);
+            var u = byId[id];
+            if (!u) {
+                setRowStatus(row, '', null);
+                return;
+            }
+            if (u.available) {
+                setRowStatus(row, '<span class="avail-mark">✓</span> libre sur la période', 'avail-free');
+                return;
+            }
+            var html = '<span class="avail-mark">⚠</span> occupé : ' + describeConflicts(u.conflicts);
+            if (u.next_free) {
+                var sameDay = u.next_free.start === u.next_free.end;
+                var rangeTxt = sameDay
+                    ? 'le ' + fmtDate(u.next_free.start)
+                    : 'du ' + fmtDate(u.next_free.start) + ' au ' + fmtDate(u.next_free.end);
+                html += '<div class="avail-next">↳ Prochaine dispo : <strong>'
+                    + u.next_free.days + ' j/h</strong>, ' + rangeTxt + '.</div>';
+            } else {
+                html += '<div class="avail-next">↳ Aucune disponibilité dans les 365 jours à venir.</div>';
+            }
+            setRowStatus(row, html, 'avail-busy');
+        });
+    }
+
+    function refresh() {
+        if (!shouldShow()) {
+            clearStatuses('');
+            return;
+        }
+        if (!isValidISODate(startEl.value) || !isValidISODate(endEl.value)) {
+            clearStatuses('<span class="cell-dim">— dates incomplètes —</span>');
+            return;
+        }
+        if (endEl.value < startEl.value) {
+            clearStatuses('<span class="cell-dim">— fin avant le début —</span>');
+            return;
+        }
+        clearStatuses('<span class="cell-dim">Chargement…</span>');
+
+        var token = ++fetchToken;
+        var url = '/planning/availability'
+            + '?start=' + encodeURIComponent(startEl.value)
+            + '&end=' + encodeURIComponent(endEl.value);
+        if (editingEventId) url += '&exclude_event_id=' + encodeURIComponent(editingEventId);
+
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (resp) {
+                if (token !== fetchToken) return null;
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                return resp.json();
+            })
+            .then(function (data) {
+                if (data === null || token !== fetchToken) return;
+                applyAvailability(data.users || []);
+            })
+            .catch(function () {
+                if (token !== fetchToken) return;
+                clearStatuses('<span class="cell-dim">Disponibilité indisponible.</span>');
+            });
+    }
+
+    typeEl.addEventListener('change', refresh);
+    startEl.addEventListener('change', refresh);
+    endEl.addEventListener('change', refresh);
+    refresh();
+})();
+</script>
+{% endblock %}

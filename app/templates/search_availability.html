@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+{% block title %}Recherche — Claudio{% endblock %}
+{% block content %}
+
+<section class="calendar-toolbar">
+    <h1 class="cal-title">Recherche</h1>
+</section>
+
+<section class="form-card form-card-wide">
+    <h2 style="margin-top:0">Recherche textuelle</h2>
+    <p class="cell-dim" style="margin-top:0">
+        Cherchez par nom dans les <strong>projets</strong>, les <strong>missions</strong>,
+        les <strong>réunions</strong> et les <strong>tâches</strong>. Recherche
+        insensible à la casse, sous-chaîne — n'importe quel fragment du nom suffit.
+    </p>
+    <form method="get" action="{{ url_for('search.availability_search') }}">
+        <div class="field-row">
+            <div class="field" style="flex:1">
+                <label for="text-q">Terme à rechercher</label>
+                <input id="text-q" type="search" name="q" autocomplete="off"
+                       placeholder="Ex : revue, formation, MEEXT…"
+                       value="{{ text_query or '' }}">
+            </div>
+            <div class="field" style="flex:0 0 auto;align-self:flex-end">
+                <button class="btn btn-primary" type="submit">Rechercher</button>
+            </div>
+        </div>
+    </form>
+
+    {% if text_query %}
+        {% if text_results.total == 0 %}
+        <p class="empty-state" style="padding:18px;margin-top:14px">
+            Aucun résultat pour <em>{{ text_query }}</em>.
+        </p>
+        {% else %}
+        <p class="cell-dim" style="margin:14px 0 8px">
+            {{ text_results.total }} résultat(s) pour <em>{{ text_query }}</em>.
+        </p>
+
+        {% if text_results.projects %}
+        <h3 style="margin:14px 0 6px">Projets ({{ text_results.projects|length }})</h3>
+        <table class="users-table">
+            <thead><tr><th>Nom</th><th>Client</th><th>Statut</th><th></th></tr></thead>
+            <tbody>
+                {% for p in text_results.projects %}
+                <tr>
+                    <td><strong>{{ p.name }}</strong>{% if p.code %} <span class="cell-dim">· {{ p.code }}</span>{% endif %}</td>
+                    <td>{{ p.client.name }}</td>
+                    <td><span class="status-pill status-{{ 'planifie' if p.status == 'actif' else 'termine' }}">{{ 'Actif' if p.status == 'actif' else 'Clos' }}</span></td>
+                    <td class="users-table-actions">
+                        <a class="btn btn-ghost" href="{{ url_for('projects.project_detail', project_id=p.id) }}">Ouvrir</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        {% if text_results.missions %}
+        <h3 style="margin:14px 0 6px">Missions ({{ text_results.missions|length }})</h3>
+        <table class="users-table">
+            <thead><tr><th>Titre</th><th>Projet</th><th>Période</th><th></th></tr></thead>
+            <tbody>
+                {% for ev in text_results.missions %}
+                <tr>
+                    <td><strong>{{ ev.title }}</strong>{% if ev.role %} <span class="cell-dim">· {{ ev.role.label }}</span>{% endif %}</td>
+                    <td>{% if ev.project %}{{ ev.project.client.name }} — {{ ev.project.name }}{% else %}<span class="cell-dim">— hors projet —</span>{% endif %}</td>
+                    <td>{{ ev.start_date.strftime('%d/%m/%Y') }}{% if ev.end_date != ev.start_date %} → {{ ev.end_date.strftime('%d/%m/%Y') }}{% endif %}</td>
+                    <td class="users-table-actions">
+                        <a class="btn btn-ghost" href="{{ url_for('planning.event_edit', event_id=ev.id) }}">Ouvrir</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        {% if text_results.meetings %}
+        <h3 style="margin:14px 0 6px">Réunions ({{ text_results.meetings|length }})</h3>
+        <table class="users-table">
+            <thead><tr><th>Nom</th><th>Projet</th><th>Catégorie</th><th>Date</th></tr></thead>
+            <tbody>
+                {% for m in text_results.meetings %}
+                <tr>
+                    <td><strong>{{ m.name }}</strong></td>
+                    <td>{{ m.project.client.name }} — {{ m.project.name }}</td>
+                    <td>{% if m.category %}{{ m.category.name }}{% else %}<span class="cell-dim">—</span>{% endif %}</td>
+                    <td>{{ m.date.strftime('%d/%m/%Y') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+
+        {% if text_results.tasks %}
+        <h3 style="margin:14px 0 6px">Tâches ({{ text_results.tasks|length }})</h3>
+        <table class="users-table">
+            <thead><tr><th>Nom</th><th>Projet</th><th>Statut</th><th>Échéance</th><th></th></tr></thead>
+            <tbody>
+                {% for t in text_results.tasks %}
+                <tr>
+                    <td><strong>{{ t.name }}</strong>{% if t.is_template %} <span class="role-tag" style="background:rgba(168,85,247,0.15);border-color:#a855f7">Modèle</span>{% endif %}</td>
+                    <td>{% if t.project %}{{ t.project.name }}{% else %}<span class="cell-dim">— sans projet —</span>{% endif %}</td>
+                    <td>{% if t.status %}{{ t.status.name }}{% else %}<span class="cell-dim">—</span>{% endif %}</td>
+                    <td>{% if t.due_date %}{{ t.due_date.strftime('%d/%m/%Y') }}{% else %}<span class="cell-dim">—</span>{% endif %}</td>
+                    <td class="users-table-actions">
+                        <a class="btn btn-ghost" href="{{ url_for('tasks.edit_task', task_id=t.id) }}">Ouvrir</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+        {% endif %}
+    {% endif %}
+</section>
+
+<section class="form-card form-card-wide" style="margin-top:18px">
+    <h2 style="margin-top:0">Recherche de disponibilité</h2>
+    <p class="cell-dim" style="margin-top:0">
+        Trouvez le prochain créneau consécutif où au moins <strong>N pentesters</strong> sont libres
+        simultanément. La charge en <strong>jours-homme</strong> est répartie sur les <strong>N pentesters</strong> :
+        la durée recherchée est <strong>⌈JH / N⌉</strong> jours ouvrés d'affilée
+        (ex. 10 JH pour 2 pentesters = 5 jours ; 20 JH pour 2 = 10 jours). Week-ends et jours fériés exclus.
+        Horizon de recherche : {{ horizon_days }} jours à partir d'aujourd'hui.
+    </p>
+
+    <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+        <div class="field-row">
+            <div class="field">
+                {{ form.jh_count.label }}
+                {{ form.jh_count(type="number", min=1, max=120) }}
+                {% for e in form.jh_count.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ form.pentester_count.label }}
+                {{ form.pentester_count(type="number", min=1, max=auditor_total or 20) }}
+                <small class="hint">Équipe actuelle : {{ auditor_total }} pentester(s).</small>
+                {% for e in form.pentester_count.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ form.role_key.label }}
+                {{ form.role_key() }}
+                <small class="hint">Restreindre la recherche aux pentesters ayant cette spécialité.</small>
+                {% for e in form.role_key.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Rechercher</button>
+        </div>
+    </form>
+</section>
+
+{% if results is not none %}
+<section class="form-card form-card-wide" style="margin-top:18px">
+    <h2 style="margin-top:0">Résultats</h2>
+    {% if results %}
+    <p class="cell-dim" style="margin-top:0">
+        {{ results|length }} créneau(x) trouvé(s){% if results|length >= 20 %} (limité aux 20 premiers){% endif %}.
+        Chaque ligne représente le début le plus tôt d'un ensemble distinct de pentesters disponibles.
+    </p>
+    <p class="cell-dim" style="margin:6px 0 12px">
+        Cochez les pentesters à intégrer puis cliquez sur <em>Ajouter</em> pour préremplir
+        un nouvel événement avec ces dates et participants.
+    </p>
+    <table class="users-table results-table">
+        <thead>
+            <tr>
+                <th>Période</th>
+                <th>Durée</th>
+                <th>Pentesters disponibles</th>
+                <th class="users-table-actions">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for slot in results %}
+            {% set slot_idx = loop.index %}
+            <tr>
+                <td>
+                    <strong>{{ slot.start.strftime('%d/%m/%Y') }}</strong>
+                    → <strong>{{ slot.end.strftime('%d/%m/%Y') }}</strong>
+                </td>
+                <td>{{ slot.days }} jour{{ 's' if slot.days > 1 else '' }} ouvré{{ 's' if slot.days > 1 else '' }}</td>
+                <td>
+                    <form method="get" action="{{ url_for('planning.event_new') }}"
+                          id="slot-form-{{ slot_idx }}"
+                          class="slot-prefill-form">
+                        <input type="hidden" name="start" value="{{ slot.start.isoformat() }}">
+                        <input type="hidden" name="end" value="{{ slot.end.isoformat() }}">
+                        <input type="hidden" name="jh_count" value="{{ form.jh_count.data }}">
+                        <small class="cell-dim">{{ slot.free_count }} disponible{{ 's' if slot.free_count > 1 else '' }}</small>
+                        <div class="slot-participants">
+                            {% for u in slot.free_auditors %}
+                            <label class="role-tag slot-participant"
+                                   style="background:color-mix(in srgb, {{ u.color }} 18%, transparent);border-color:{{ u.color }};color:var(--text)">
+                                <input type="checkbox" name="participants" value="{{ u.id }}" checked>
+                                {{ u.full_name }} <span class="cell-dim">· {{ u.role_label }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </form>
+                </td>
+                <td class="users-table-actions">
+                    <button class="btn btn-primary" type="submit" form="slot-form-{{ slot_idx }}">
+                        Ajouter
+                    </button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <style>
+        .slot-prefill-form { margin: 0; }
+        .slot-participants { display: flex; flex-wrap: wrap; gap: 6px; }
+        .slot-participant { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+        .slot-participant input[type="checkbox"] { margin: 0; }
+        .results-table td, .results-table th { vertical-align: middle; }
+        /* Results rows are tall (participant tags wrap), so the global
+           display:flex on .users-table-actions can't vertical-align. Revert it
+           to a normal cell here so the button centres against the full row. */
+        .results-table .users-table-actions {
+            display: table-cell;
+            text-align: right;
+            white-space: nowrap;
+            vertical-align: middle;
+        }
+    </style>
+    {% else %}
+    <p class="empty-state" style="padding:24px">
+        Aucun créneau correspondant trouvé dans les {{ horizon_days }} prochains jours.
+    </p>
+    {% endif %}
+</section>
+{% endif %}
+
+{% endblock %}

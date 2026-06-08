@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}Tâches — Claudio{% endblock %}
+{% block content %}
+
+<section class="calendar-toolbar">
+    <h1 class="cal-title">Tâches</h1>
+</section>
+
+<details class="form-card form-card-wide" open>
+    <summary class="form-card-summary">+ Nouvelle tâche</summary>
+    <form method="post" action="{{ url_for('tasks.create_task') }}" novalidate>
+        {{ task_form.hidden_tag() }}
+
+        <div class="field">
+            {{ task_form.name.label }}
+            {{ task_form.name() }}
+            {% for e in task_form.name.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            {{ task_form.description.label }}
+            {{ task_form.description(rows=3) }}
+            {% for e in task_form.description.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                {{ task_form.due_date.label }}
+                {{ task_form.due_date(type="date") }}
+                <small class="hint">Facultatif. Une date affichera la tâche sur la vue planning.</small>
+                {% for e in task_form.due_date.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ task_form.status_id.label }}
+                {{ task_form.status_id() }}
+            </div>
+        </div>
+
+        <div class="field">
+            {{ task_form.project_id.label }}
+            {{ task_form.project_id() }}
+            <small class="hint">Obligatoire — sauf pour un modèle de tâche (case ci-dessous).
+                <a href="{{ url_for('projects.projects_list') }}" target="_blank" rel="noopener">Gérer les projets ↗</a>
+            </small>
+            {% for e in task_form.project_id.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            <label class="checkbox-inline">
+                {{ task_form.is_template(id="new-task-is-template") }}
+                <span>{{ task_form.is_template.label.text }}</span>
+            </label>
+            <small class="hint">À cocher pour une tâche générique : elle ne s'affiche pas sur le planning, mais est dupliquée (statut « À faire », date +5 j) à chaque création de réunion. Les modèles n'appartiennent à aucun projet.</small>
+        </div>
+
+        <div class="field" id="new-task-auto-mission-field">
+            <label class="checkbox-inline">
+                {{ task_form.auto_after_mission(id="new-task-auto-after-mission") }}
+                <span>{{ task_form.auto_after_mission.label.text }}</span>
+            </label>
+            <small class="hint">Si coché, ce modèle sera automatiquement copié sur le projet à chaque création d'une mission technique. Échéance : <em>fin de mission + N jours ouvrés</em>.</small>
+        </div>
+
+        <div class="field" id="new-task-auto-offset-field">
+            {{ task_form.auto_offset_days.label }}
+            {{ task_form.auto_offset_days(type="number", min=0, max=365) }}
+            {% for e in task_form.auto_offset_days.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">Créer la tâche</button>
+        </div>
+    </form>
+    <script nonce="{{ csp_nonce }}">
+    (function () {
+        var tpl = document.getElementById('new-task-is-template');
+        var autoFld = document.getElementById('new-task-auto-mission-field');
+        var autoChk = document.getElementById('new-task-auto-after-mission');
+        var offsetFld = document.getElementById('new-task-auto-offset-field');
+        if (!tpl || !autoFld || !autoChk || !offsetFld) return;
+        function refresh() {
+            var on = tpl.checked;
+            autoFld.style.display = on ? '' : 'none';
+            offsetFld.style.display = (on && autoChk.checked) ? '' : 'none';
+            if (!on) autoChk.checked = false;
+        }
+        tpl.addEventListener('change', refresh);
+        autoChk.addEventListener('change', refresh);
+        refresh();
+    })();
+    </script>
+</details>
+
+<table class="users-table" style="margin-top:18px">
+    <thead>
+        <tr>
+            <th>Nom</th>
+            <th>Projet</th>
+            <th>Description</th>
+            <th>Date</th>
+            <th>Statut</th>
+            <th class="users-table-actions">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for t in tasks %}
+        <tr>
+            <td>
+                <strong>{{ t.name }}</strong>
+                {% if t.is_template %}
+                <span class="role-tag" style="background:rgba(168,85,247,0.15);border-color:#a855f7;color:#d8b4fe" title="Modèle générique — dupliqué après chaque réunion">Modèle</span>
+                {% endif %}
+                {% if t.is_template and t.auto_after_mission %}
+                <span class="role-tag" style="background:rgba(245,158,11,0.15);border-color:#f59e0b;color:#fcd34d" title="Auto-créé après chaque mission technique (+{{ t.auto_offset_days }} j)">Auto-mission +{{ t.auto_offset_days }} j</span>
+                {% endif %}
+            </td>
+            <td>
+                {% if t.project %}
+                    <a href="{{ url_for('projects.project_detail', project_id=t.project_id) }}">
+                        {{ t.project.client.name }} — {{ t.project.name }}
+                    </a>
+                {% else %}
+                    <span class="cell-dim">— hors projet —</span>
+                {% endif %}
+            </td>
+            <td class="cell-dim">{{ t.description or '—' }}</td>
+            <td>{{ t.due_date.strftime('%d/%m/%Y') if t.due_date else '—' }}</td>
+            <td>
+                {% if t.status %}
+                    <span class="task-status-pill" style="--status-color: {{ t.status.color }}">{{ t.status.name }}</span>
+                {% else %}
+                    <span class="cell-dim">— aucun —</span>
+                {% endif %}
+            </td>
+            <td class="users-table-actions">
+                <a class="btn btn-ghost" href="{{ url_for('tasks.edit_task', task_id=t.id) }}">Modifier</a>
+                <form method="post" action="{{ url_for('tasks.delete_task', task_id=t.id) }}"
+                      class="inline-form"
+                      onsubmit="return confirm('Supprimer la tâche « {{ t.name }} » ?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <button class="btn btn-danger" type="submit">Supprimer</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="cell-dim" style="text-align:center;padding:24px">Aucune tâche pour le moment.</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<details class="form-card form-card-wide" style="margin-top:24px">
+    <summary class="form-card-summary">Statuts ({{ statuses|length }})</summary>
+
+    <table class="users-table">
+        <thead>
+            <tr>
+                <th></th>
+                <th>Emoji</th>
+                <th>Nom</th>
+                <th>Tâches</th>
+                <th class="users-table-actions">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for s in statuses %}
+            <tr>
+                <td><span class="user-dot" style="--user-color: {{ s.color }}"></span></td>
+                <td>{{ s.emoji or '—' }}</td>
+                <td><strong>{{ s.name }}</strong></td>
+                <td>{{ s.tasks|length }}</td>
+                <td class="users-table-actions">
+                    <a class="btn btn-ghost" href="{{ url_for('tasks.edit_status', status_id=s.id) }}">Modifier</a>
+                    <form method="post" action="{{ url_for('tasks.delete_status', status_id=s.id) }}"
+                          class="inline-form"
+                          onsubmit="return confirm('Supprimer le statut « {{ s.name }} » ? {% if s.tasks %}{{ s.tasks|length }} tâche(s) perdront leur statut.{% endif %}');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button class="btn btn-danger" type="submit">Supprimer</button>
+                    </form>
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5" class="cell-dim" style="text-align:center;padding:18px">Aucun statut. Créez-en un ci-dessous.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <form method="post" action="{{ url_for('tasks.create_status') }}" novalidate style="margin-top:14px">
+        {{ status_form.hidden_tag() }}
+        <div class="field-row">
+            <div class="field">
+                {{ status_form.name.label }}
+                {{ status_form.name() }}
+                {% for e in status_form.name.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ status_form.color.label }}
+                {{ status_form.color(type="color") }}
+                {% for e in status_form.color.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ status_form.emoji.label }}
+                {{ status_form.emoji(placeholder="📝", maxlength=16) }}
+                <small class="hint">Affiché à côté du nom de la tâche sur le planning.</small>
+                {% for e in status_form.emoji.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" type="submit">+ Nouveau statut</button>
+        </div>
+    </form>
+</details>
+
+{% endblock %}

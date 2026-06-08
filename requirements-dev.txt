@@ -1,0 +1,6 @@
+# Development / CI tooling (not installed in the production image).
+-r requirements.txt
+pytest==8.3.3
+ruff==0.6.9
+pip-audit==2.7.3
+alembic==1.13.2

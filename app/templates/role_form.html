@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Modifier un rôle — Claudio{% endblock %}
+{% block content %}
+<section class="form-card form-card-wide">
+    <h1>Modifier le rôle</h1>
+    <p class="cell-dim" style="margin-top:0">
+        Identifiant interne : <code>{{ role.key }}</code> (immuable — il sert de
+        clé de référence sur les utilisateurs et les sous-types de mission).
+    </p>
+    <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+        <div class="field-row">
+            <div class="field">
+                {{ form.label.label }}
+                {{ form.label(autofocus=true) }}
+                {% for e in form.label.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+            <div class="field">
+                {{ form.color.label }}
+                {{ form.color(type='color') }}
+                {% for e in form.color.errors %}<small class="err">{{ e }}</small>{% endfor %}
+            </div>
+        </div>
+        <div class="form-actions">
+            <a class="btn btn-ghost" href="{{ url_for('users.list_users') }}">Annuler</a>
+            <button class="btn btn-primary" type="submit">Enregistrer</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

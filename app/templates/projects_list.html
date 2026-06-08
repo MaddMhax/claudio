@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Projets — Claudio{% endblock %}
+{% block content %}
+<section class="calendar-toolbar">
+    <h1 class="cal-title">Projets</h1>
+    <div class="cal-actions">
+        <a class="btn btn-ghost" href="{{ url_for('projects.projects_synthesis') }}">Synthèse</a>
+        {% if current_user.can_manage_events %}
+        <a class="btn btn-ghost" href="{{ url_for('projects.export_form') }}">⬇ Exporter</a>
+        <a class="btn btn-primary" href="{{ url_for('projects.project_new') }}">+ Nouveau projet</a>
+        {% endif %}
+    </div>
+</section>
+
+{% if rows %}
+<div class="projects-table-wrap">
+<table class="users-table projects-table">
+    <thead>
+        <tr>
+            <th>Projet</th>
+            <th>Client</th>
+            <th>Statut</th>
+            <th class="cell-num" title="Missions ouvertes / total">Missions</th>
+            <th class="cell-num">Réunions</th>
+            <th class="cell-num">Tâches</th>
+            <th class="cell-num" title="Cumul jours/homme">J/H</th>
+            {% if current_user.can_manage_events %}<th></th>{% endif %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in rows %}
+        {% set p = r.project %}
+        <tr>
+            <td>
+                <a href="{{ url_for('projects.project_detail', project_id=p.id) }}"><strong>{{ p.name }}</strong></a>
+                {% if p.code %}<div class="cell-dim" style="font-size:0.85em">{{ p.code }}</div>{% endif %}
+            </td>
+            <td>{{ p.client.name }}</td>
+            <td>
+                <span class="status-pill status-{{ 'planifie' if p.status == 'actif' else 'termine' }}">
+                    {{ status_labels[p.status] }}
+                </span>
+            </td>
+            <td class="cell-num">
+                {% if r.mission_count %}
+                    {{ r.open_missions }} / {{ r.mission_count }}
+                {% else %}
+                    <span class="cell-dim">0</span>
+                {% endif %}
+            </td>
+            <td class="cell-num">{{ r.meeting_count or '0' }}</td>
+            <td class="cell-num">{{ r.task_count or '0' }}</td>
+            <td class="cell-num">{{ r.person_days or '0' }}</td>
+            {% if current_user.can_manage_events %}
+            <td class="cell-nowrap">
+                <a class="btn btn-ghost" href="{{ url_for('projects.project_detail', project_id=p.id) }}">Consulter</a>
+                <a class="btn btn-ghost" href="{{ url_for('projects.project_edit', project_id=p.id) }}">Modifier</a>
+            </td>
+            {% endif %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% else %}
+<div class="empty-state">
+    Aucun projet pour le moment.
+    {% if current_user.can_manage_events %}
+    <div style="margin-top:12px">
+        <a class="btn btn-primary" href="{{ url_for('projects.project_new') }}">+ Créer un premier projet</a>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

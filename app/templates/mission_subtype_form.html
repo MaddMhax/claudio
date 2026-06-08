@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Modifier le sous-type — Claudio{% endblock %}
+{% block content %}
+<section class="form-card">
+    <h1>Modifier le sous-type</h1>
+    <small class="hint" style="display:block;margin-bottom:14px">
+        Type parent : <strong>{{ mission_type.name }}</strong>
+    </small>
+
+    <form method="post" novalidate>
+        {{ form.hidden_tag() }}
+
+        <div class="field">
+            {{ form.name.label }}
+            {{ form.name(autofocus=true) }}
+            {% for e in form.name.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            {{ form.color.label }}
+            {{ form.color(type="color") }}
+            {% for e in form.color.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="field">
+            {{ form.role_id.label }}
+            {{ form.role_id() }}
+            <small class="hint">
+                Si renseignée, tout événement de ce sous-type héritera de cette spécialité.
+                Les valeurs proviennent de <a href="{{ url_for('users.list_users') }}">Utilisateurs → Rôles</a>.
+            </small>
+            {% for e in form.role_id.errors %}<small class="err">{{ e }}</small>{% endfor %}
+        </div>
+
+        <div class="form-actions">
+            <a class="btn btn-ghost" href="{{ url_for('mission_types.edit_type', type_id=mission_type.id) }}">Annuler</a>
+            <button class="btn btn-primary" type="submit">Enregistrer</button>
+        </div>
+    </form>
+</section>
+{% endblock %}

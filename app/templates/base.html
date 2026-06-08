@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Claudio{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/claudio_logo_transparent.svg') }}">
+    <script nonce="{{ csp_nonce }}">
+    // Resolve the theme before the stylesheet paints so we never flash the
+    // wrong palette. Source of truth is localStorage ('theme' = 'light' or
+    // 'dark'); fallback honours the OS preference, defaulting to dark.
+    (function () {
+        try {
+            var stored = window.localStorage.getItem('theme');
+            var theme = stored === 'light' || stored === 'dark'
+                ? stored
+                : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+            document.documentElement.setAttribute('data-theme', theme);
+        } catch (e) {
+            document.documentElement.setAttribute('data-theme', 'dark');
+        }
+    })();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css', v=app_version) }}">
+</head>
+<body>
+    <header class="topbar">
+        <a href="{{ url_for('planning.calendar_default') }}" class="brand">
+            <span class="brand-mark" role="img" aria-label="Claudio"></span>
+            <span class="brand-text">Claudio</span>
+        </a>
+        <nav class="topbar-nav">
+            {% if current_user.is_authenticated %}
+                <a class="btn btn-ghost" href="{{ url_for('planning.calendar_default') }}">Planning</a>
+                <a class="btn btn-ghost" href="{{ url_for('dashboard.home') }}">Ma semaine</a>
+                <a class="btn btn-ghost" href="{{ url_for('projects.projects_list') }}">Projets</a>
+                {% if current_user.can_manage_events %}
+                <a class="btn btn-ghost" href="{{ url_for('search.availability_search') }}"
+                   title="Recherche de disponibilité (Ctrl+K)">Recherche <kbd class="hotkey">⌘K</kbd></a>
+                {% endif %}
+                {% if current_user.can_manage_events %}
+                <div class="menu-wrap">
+                    <button type="button" class="btn btn-ghost menu-toggle"
+                            aria-expanded="false" aria-haspopup="menu">
+                        Administration <span class="caret" aria-hidden="true">▾</span>
+                    </button>
+                    <div class="menu-panel" hidden role="menu">
+                        <a role="menuitem" href="{{ url_for('projects.projects_synthesis') }}">Synthèse</a>
+                        <a role="menuitem" href="{{ url_for('clients.list_clients') }}">Clients</a>
+                        {% if current_user.is_admin %}
+                        <a role="menuitem" href="{{ url_for('users.list_users') }}">Utilisateurs</a>
+                        {% endif %}
+                        <a role="menuitem" href="{{ url_for('meetings.list_meetings') }}">Réunions</a>
+                        <a role="menuitem" href="{{ url_for('tasks.list_tasks') }}">Tâches</a>
+                        <a role="menuitem" href="{{ url_for('holidays_admin.list_overrides') }}">Jours fériés</a>
+                        {% if current_user.is_admin %}
+                        <a role="menuitem" href="{{ url_for('mission_types.list_types') }}">Types de mission</a>
+                        <a role="menuitem" href="{{ url_for('mission_types.list_absence_types') }}">Types d'absence</a>
+                        <a role="menuitem" href="{{ url_for('sso_admin.edit') }}">SSO / OIDC</a>
+                        <a role="menuitem" href="{{ url_for('audit_admin.view_log') }}">Journal d'audit</a>
+                        <a role="menuitem" href="{{ url_for('api_admin.list_tokens') }}">API / Swagger</a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                <div class="menu-wrap user-menu-wrap">
+                    <button type="button" class="btn btn-ghost menu-toggle user-menu-toggle"
+                            aria-expanded="false" aria-haspopup="menu"
+                            style="--user-color: {{ current_user.color }}"
+                            title="{{ current_user.full_name }} · {{ current_user.role_label }}">
+                        <span class="user-menu-avatar" aria-hidden="true">👤</span>
+                        <span class="caret" aria-hidden="true">▾</span>
+                    </button>
+                    <div class="menu-panel user-menu-panel" hidden role="menu">
+                        <div class="user-menu-head">
+                            <span class="user-menu-name" style="--user-color: {{ current_user.color }}">{{ current_user.full_name }}</span>
+                            <span class="user-role">{{ current_user.role_label }}</span>
+                        </div>
+                        <a class="user-menu-item" role="menuitem" href="{{ url_for('calendar_feed.subscribe') }}">
+                            <span aria-hidden="true">📅</span> Mon calendrier (iCal)
+                        </a>
+                        <a class="user-menu-item" role="menuitem" href="{{ url_for('auth.change_password') }}">
+                            <span aria-hidden="true">🔑</span> Changer mon mot de passe
+                        </a>
+                        <button type="button" id="theme-toggle" class="user-menu-item" role="menuitem"
+                                aria-label="Basculer thème clair / sombre">
+                            <span aria-hidden="true">🌙</span> Thème clair / sombre
+                        </button>
+                        <form action="{{ url_for('auth.logout') }}" method="post" class="user-menu-form">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button class="user-menu-item" type="submit" role="menuitem">
+                                <span aria-hidden="true">⎋</span> Déconnexion
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {% endif %}
+        </nav>
+    </header>
+
+    {% if current_user.is_authenticated %}
+    <script nonce="{{ csp_nonce }}">
+    // ===== Theme switcher =====
+    // The actual theme is applied in <head>; this script only handles the
+    // toggle button + the icon. Updating localStorage triggers no event by
+    // itself, so we re-apply the attribute here too.
+    (function () {
+        var btn = document.getElementById('theme-toggle');
+        if (!btn) return;
+        var icon = btn.querySelector('span');
+
+        function syncIcon() {
+            var theme = document.documentElement.getAttribute('data-theme') || 'dark';
+            // Show the icon of the theme you'd switch TO.
+            if (icon) icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+        }
+        syncIcon();
+
+        btn.addEventListener('click', function () {
+            var current = document.documentElement.getAttribute('data-theme') || 'dark';
+            var next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            try { window.localStorage.setItem('theme', next); } catch (e) {}
+            syncIcon();
+        });
+    })();
+
+    {% if current_user.can_manage_events %}
+    // ===== Ctrl+K / Cmd+K → Recherche page =====
+    // On any other page: navigate to /search. Already on /search: focus the
+    // text-search input so the shortcut also acts as "jump to the search box".
+    (function () {
+        var url = "{{ url_for('search.availability_search') }}";
+        document.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey &&
+                (e.key === 'k' || e.key === 'K')) {
+                e.preventDefault();
+                var input = document.getElementById('text-q');
+                if (input) {
+                    input.focus();
+                    input.select();
+                    return;
+                }
+                window.location.href = url;
+            }
+        });
+    })();
+    {% endif %}
+
+    // ===== Topbar dropdown menus (People, Audit, …) =====
+    // Each .menu-wrap contains a .menu-toggle button + a .menu-panel. Opening
+    // one closes the others so only a single panel is visible at a time.
+    (function () {
+        var wraps = document.querySelectorAll('.menu-wrap');
+        if (!wraps.length) return;
+
+        var openWrap = null;
+        function close(wrap) {
+            if (!wrap) return;
+            var btn = wrap.querySelector('.menu-toggle');
+            var panel = wrap.querySelector('.menu-panel');
+            if (panel) panel.hidden = true;
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+            if (openWrap === wrap) openWrap = null;
+        }
+        function open(wrap) {
+            if (openWrap && openWrap !== wrap) close(openWrap);
+            var btn = wrap.querySelector('.menu-toggle');
+            var panel = wrap.querySelector('.menu-panel');
+            if (panel) panel.hidden = false;
+            if (btn) btn.setAttribute('aria-expanded', 'true');
+            openWrap = wrap;
+        }
+        function onDocClick(e) {
+            if (!openWrap) return;
+            if (!openWrap.contains(e.target)) close(openWrap);
+        }
+        function onKey(e) {
+            if (e.key === 'Escape') close(openWrap);
+        }
+        document.addEventListener('click', onDocClick, true);
+        document.addEventListener('keydown', onKey, true);
+
+        wraps.forEach(function (wrap) {
+            var btn = wrap.querySelector('.menu-toggle');
+            var panel = wrap.querySelector('.menu-panel');
+            if (!btn || !panel) return;
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                if (panel.hidden) open(wrap); else close(wrap);
+            });
+        });
+    })();
+    </script>
+    {% endif %}
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flash-list">
+                {% for category, message in messages %}
+                    <li class="flash flash-{{ category }}">{{ message }}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <script nonce="{{ csp_nonce }}">
+    // Delegated confirm() for destructive actions. Markup opts in with a
+    // [data-confirm] attribute (on a <form> or a submit <button>) instead of an
+    // inline on* handler, so the strict CSP path needs no inline-script allowance.
+    (function () {
+        document.addEventListener('submit', function (e) {
+            var f = e.target;
+            if (f && f.dataset && f.dataset.confirm && !window.confirm(f.dataset.confirm)) {
+                e.preventDefault();
+            }
+        }, true);
+        document.addEventListener('click', function (e) {
+            var b = e.target.closest ? e.target.closest('button[data-confirm]') : null;
+            if (b && !window.confirm(b.dataset.confirm)) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }, true);
+    })();
+    </script>
+
+    <footer class="app-footer">
+        <span class="footer-brand">Claudio</span>
+        <span class="footer-sep">·</span>
+        <span class="footer-version">v{{ app_version }}</span>
+        <span class="footer-build" title="Nom de build — d'après Furcifer, le genre de caméléons qui change de couleur">« {{ app_build_name }} »</span>
+    </footer>
+</body>
+</html>
