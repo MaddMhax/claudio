@@ -10,6 +10,10 @@ Le caméléon qui orchestre le planning de votre équipe pentest, mois après mo
 - **Fuseau** : horodatages affichés en heure locale Europe/Paris
 - **Déploiement** : un seul `docker compose up` lance l'ensemble
 
+> ⚠️ **À propos de ce projet**
+>
+> Ce projet a été vibecodé selon mes besoins actuels avec Claude Code. Il peut présenter des erreurs, des incohérences, et est fourni « as is ». À utiliser avec précaution en production. Je ne peux pas fournir de support en cas de problèmes. Les merge requests ou issues sont les bienvenues.
+
 ---
 
 ## 1. Démarrage rapide
